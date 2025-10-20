@@ -270,11 +270,11 @@ coin_color_map:
 #------------------------------------------------------------------------------
 .globl game_score
 .globl game_lives
-.globl game_state
+.globl game_state_const
 
 game_score:           .word 0             # Current score
 game_lives:           .word 3             # Remaining lives
-game_state:           .word 0             # 0=playing, 1=game_over, 2=win
+game_state_const:           .word 0             # 0=playing, 1=game_over, 2=win
 
 
 #------------------------------------------------------------------------------

@@ -556,7 +556,7 @@ debug_skip_space:
     syscall
     
     li $v0, 4
-    la $a0, debug_newline
+    la $a0, debug_newline_input
     syscall
     
     lw $ra, 0($sp)
@@ -568,13 +568,13 @@ debug_skip_space:
 # DEBUG DATA
 #==============================================================================
 .data
-debug_input_header: .asciiz "Input State: "
-debug_left_msg:     .asciiz "LEFT "
-debug_right_msg:    .asciiz "RIGHT "
-debug_up_msg:       .asciiz "UP "
-debug_space_msg:    .asciiz "SPACE "
-debug_lastkey_msg:  .asciiz "| Last Key Code: "
-debug_newline:      .asciiz "\n"
+debug_input_header:   .asciiz "Input State: "
+debug_left_msg:       .asciiz "LEFT "
+debug_right_msg:      .asciiz "RIGHT "
+debug_up_msg:         .asciiz "UP "
+debug_space_msg:      .asciiz "SPACE "
+debug_lastkey_msg:    .asciiz "| Last Key Code: "
+debug_newline_input:  .asciiz "\n"
 
 #==============================================================================
 # END OF INPUT MODULE

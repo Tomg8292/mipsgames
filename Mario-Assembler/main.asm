@@ -1,3 +1,11 @@
+.include "constants.asm"
+.include "render.asm"
+.include "input.asm"
+.include "physics.asm"
+.include "collision.asm"
+.include "objects.asm"
+.include "level.asm"
+
 #==============================================================================
 # main.asm - Complete Mario Platformer Game
 #==============================================================================
