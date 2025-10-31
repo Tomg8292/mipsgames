@@ -143,11 +143,11 @@ game_loop:
     j game_loop
 
 game_win:
-    jal show_win_screen
+    jal show_win_screen_visual
     j wait_for_restart
 
 game_over:
-    jal show_game_over_screen
+    jal show_game_over_screen_visual
     
 wait_for_restart:
     li $t0, 0xffff0000
@@ -1017,12 +1017,194 @@ show_start_screen:
     addi $sp, $sp, 4
     jr $ra
 
-show_win_screen:
+# ==================== SHOW WIN SCREEN (VISUAL) ====================
+show_win_screen_visual:
     addi $sp, $sp, -4
     sw $ra, 0($sp)
     
-    jal clear_screen
+    # Pintar toda la pantalla de azul cielo
+    li $t0, 0x10008000
+    lw $t1, COLOR_SKY
+    li $t2, 2048
     
+win_clear:
+    sw $t1, 0($t0)
+    addi $t0, $t0, 4
+    addi $t2, $t2, -1
+    bgtz $t2, win_clear
+    
+    # Color amarillo para el texto (como las monedas)
+    li $s7, 0xFFD700
+    
+    # ===== LETRA Y (posición x=10, y=8) =====
+    li $a0, 10
+    li $a1, 8
+    li $a2, 1
+    li $a3, 5
+    move $t0, $s7
+    jal fill_rect
+    
+    li $a0, 14
+    li $a1, 8
+    li $a2, 1
+    li $a3, 5
+    move $t0, $s7
+    jal fill_rect
+    
+    li $a0, 11
+    li $a1, 10
+    li $a2, 1
+    li $a3, 2
+    move $t0, $s7
+    jal fill_rect
+    
+    li $a0, 13
+    li $a1, 10
+    li $a2, 1
+    li $a3, 2
+    move $t0, $s7
+    jal fill_rect
+    
+    li $a0, 12
+    li $a1, 11
+    li $a2, 1
+    li $a3, 2
+    move $t0, $s7
+    jal fill_rect
+    
+    # ===== LETRA O (posición x=16, y=8) =====
+    li $a0, 16
+    li $a1, 8
+    li $a2, 4
+    li $a3, 5
+    move $t0, $s7
+    jal fill_rect
+    
+    li $a0, 17
+    li $a1, 9
+    li $a2, 2
+    li $a3, 3
+    lw $t0, COLOR_SKY  # Color del cielo
+    jal fill_rect
+    
+    # ===== LETRA U (posición x=21, y=8) =====
+    li $a0, 21
+    li $a1, 8
+    li $a2, 1
+    li $a3, 5
+    move $t0, $s7
+    jal fill_rect
+    
+    li $a0, 24
+    li $a1, 8
+    li $a2, 1
+    li $a3, 5
+    move $t0, $s7
+    jal fill_rect
+    
+    li $a0, 21
+    li $a1, 12
+    li $a2, 4
+    li $a3, 1
+    move $t0, $s7
+    jal fill_rect
+    
+    # ===== LETRA W (posición x=10, y=15) =====
+    li $a0, 10
+    li $a1, 15
+    li $a2, 1
+    li $a3, 5
+    move $t0, $s7
+    jal fill_rect
+    
+    li $a0, 14
+    li $a1, 15
+    li $a2, 1
+    li $a3, 5
+    move $t0, $s7
+    jal fill_rect
+    
+    li $a0, 11
+    li $a1, 18
+    li $a2, 1
+    li $a3, 2
+    move $t0, $s7
+    jal fill_rect
+    
+    li $a0, 13
+    li $a1, 18
+    li $a2, 1
+    li $a3, 2
+    move $t0, $s7
+    jal fill_rect
+    
+    li $a0, 12
+    li $a1, 19
+    li $a2, 1
+    li $a3, 1
+    move $t0, $s7
+    jal fill_rect
+    
+    # ===== LETRA I (posición x=16, y=15) =====
+    li $a0, 18
+    li $a1, 15
+    li $a2, 1
+    li $a3, 5
+    move $t0, $s7
+    jal fill_rect
+    
+    # ===== LETRA N (posición x=20, y=15) =====
+    li $a0, 20
+    li $a1, 15
+    li $a2, 1
+    li $a3, 5
+    move $t0, $s7
+    jal fill_rect
+    
+    li $a0, 24
+    li $a1, 15
+    li $a2, 1
+    li $a3, 5
+    move $t0, $s7
+    jal fill_rect
+    
+    li $a0, 21
+    li $a1, 16
+    li $a2, 1
+    li $a3, 1
+    move $t0, $s7
+    jal fill_rect
+    
+    li $a0, 22
+    li $a1, 17
+    li $a2, 1
+    li $a3, 1
+    move $t0, $s7
+    jal fill_rect
+    
+    li $a0, 23
+    li $a1, 18
+    li $a2, 1
+    li $a3, 1
+    move $t0, $s7
+    jal fill_rect
+    
+    # Dibujar Mario sonriente en el centro
+    li $a0, 28
+    li $a1, 20
+    li $a2, 2
+    li $a3, 2
+    lw $t0, COLOR_MARIO_RED
+    jal fill_rect
+    
+    li $a0, 28
+    li $a1, 19
+    li $a2, 2
+    li $a3, 1
+    lw $t0, COLOR_MARIO_SKIN
+    jal fill_rect
+    
+    # Mostrar estadísticas en consola
     li $v0, 4
     la $a0, msg_win
     syscall
@@ -1045,12 +1227,251 @@ show_win_screen:
     addi $sp, $sp, 4
     jr $ra
 
-show_game_over_screen:
+# ==================== SHOW GAME OVER SCREEN (VISUAL) ====================
+show_game_over_screen_visual:
     addi $sp, $sp, -4
     sw $ra, 0($sp)
     
-    jal clear_screen
+    # Pintar toda la pantalla de negro
+    li $t0, 0x10008000
+    li $t1, 0x000000
+    li $t2, 2048
     
+gameover_clear:
+    sw $t1, 0($t0)
+    addi $t0, $t0, 4
+    addi $t2, $t2, -1
+    bgtz $t2, gameover_clear
+    
+    # Color rojo para el texto
+    li $s7, 0xFF0000
+    
+    # ===== LETRA G (posición x=10, y=12) =====
+    li $a0, 10
+    li $a1, 12
+    li $a2, 4
+    li $a3, 5
+    move $t0, $s7
+    jal fill_rect
+    
+    li $a0, 11
+    li $a1, 13
+    li $a2, 2
+    li $a3, 3
+    li $t0, 0x000000
+    jal fill_rect
+    
+    li $a0, 12
+    li $a1, 14
+    li $a2, 2
+    li $a3, 1
+    move $t0, $s7
+    jal fill_rect
+    
+    # ===== LETRA A (posición x=15, y=12) =====
+    li $a0, 15
+    li $a1, 12
+    li $a2, 1
+    li $a3, 5
+    move $t0, $s7
+    jal fill_rect
+    
+    li $a0, 18
+    li $a1, 12
+    li $a2, 1
+    li $a3, 5
+    move $t0, $s7
+    jal fill_rect
+    
+    li $a0, 15
+    li $a1, 12
+    li $a2, 4
+    li $a3, 1
+    move $t0, $s7
+    jal fill_rect
+    
+    li $a0, 15
+    li $a1, 14
+    li $a2, 4
+    li $a3, 1
+    move $t0, $s7
+    jal fill_rect
+    
+    # ===== LETRA M (posición x=20, y=12) =====
+    li $a0, 20
+    li $a1, 12
+    li $a2, 1
+    li $a3, 5
+    move $t0, $s7
+    jal fill_rect
+    
+    li $a0, 24
+    li $a1, 12
+    li $a2, 1
+    li $a3, 5
+    move $t0, $s7
+    jal fill_rect
+    
+    li $a0, 21
+    li $a1, 13
+    li $a2, 1
+    li $a3, 2
+    move $t0, $s7
+    jal fill_rect
+    
+    li $a0, 23
+    li $a1, 13
+    li $a2, 1
+    li $a3, 2
+    move $t0, $s7
+    jal fill_rect
+    
+    # ===== LETRA E (posición x=26, y=12) =====
+    li $a0, 26
+    li $a1, 12
+    li $a2, 1
+    li $a3, 5
+    move $t0, $s7
+    jal fill_rect
+    
+    li $a0, 26
+    li $a1, 12
+    li $a2, 4
+    li $a3, 1
+    move $t0, $s7
+    jal fill_rect
+    
+    li $a0, 26
+    li $a1, 14
+    li $a2, 3
+    li $a3, 1
+    move $t0, $s7
+    jal fill_rect
+    
+    li $a0, 26
+    li $a1, 16
+    li $a2, 4
+    li $a3, 1
+    move $t0, $s7
+    jal fill_rect
+    
+    # ===== LETRA O (posición x=15, y=19) =====
+    li $a0, 15
+    li $a1, 19
+    li $a2, 4
+    li $a3, 5
+    move $t0, $s7
+    jal fill_rect
+    
+    li $a0, 16
+    li $a1, 20
+    li $a2, 2
+    li $a3, 3
+    li $t0, 0x000000
+    jal fill_rect
+    
+    # ===== LETRA V (posición x=20, y=19) =====
+    li $a0, 20
+    li $a1, 19
+    li $a2, 1
+    li $a3, 3
+    move $t0, $s7
+    jal fill_rect
+    
+    li $a0, 24
+    li $a1, 19
+    li $a2, 1
+    li $a3, 3
+    move $t0, $s7
+    jal fill_rect
+    
+    li $a0, 21
+    li $a1, 22
+    li $a2, 1
+    li $a3, 1
+    move $t0, $s7
+    jal fill_rect
+    
+    li $a0, 23
+    li $a1, 22
+    li $a2, 1
+    li $a3, 1
+    move $t0, $s7
+    jal fill_rect
+    
+    li $a0, 22
+    li $a1, 23
+    li $a2, 1
+    li $a3, 1
+    move $t0, $s7
+    jal fill_rect
+    
+    # ===== LETRA E (posición x=26, y=19) =====
+    li $a0, 26
+    li $a1, 19
+    li $a2, 1
+    li $a3, 5
+    move $t0, $s7
+    jal fill_rect
+    
+    li $a0, 26
+    li $a1, 19
+    li $a2, 4
+    li $a3, 1
+    move $t0, $s7
+    jal fill_rect
+    
+    li $a0, 26
+    li $a1, 21
+    li $a2, 3
+    li $a3, 1
+    move $t0, $s7
+    jal fill_rect
+    
+    li $a0, 26
+    li $a1, 23
+    li $a2, 4
+    li $a3, 1
+    move $t0, $s7
+    jal fill_rect
+    
+    # ===== LETRA R (posición x=31, y=19) =====
+    li $a0, 31
+    li $a1, 19
+    li $a2, 1
+    li $a3, 5
+    move $t0, $s7
+    jal fill_rect
+    
+    li $a0, 31
+    li $a1, 19
+    li $a2, 3
+    li $a3, 1
+    move $t0, $s7
+    jal fill_rect
+    
+    li $a0, 31
+    li $a1, 21
+    li $a2, 3
+    li $a3, 1
+    move $t0, $s7
+    jal fill_rect
+    
+    li $a0, 34
+    li $a1, 19
+    li $a2, 1
+    li $a3, 3
+    move $t0, $s7
+    jal fill_rect
+    
+    li $a0, 33
+    li $a1, 22
+    li $a2, 1
+    li $a3, 2
+    move $t0, $s7
+    jal fill_rect
+    
+    # Mostrar estadísticas en consola
     li $v0, 4
     la $a0, msg_gameover
     syscall
