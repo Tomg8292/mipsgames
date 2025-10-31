@@ -1,4 +1,4 @@
-# Super Mario Bros - MIPS Assembly with SCROLLING
+# Super Mario Bros - MIPS Assembly with SCROLLING (FIXED)
 # BITMAP DISPLAY SETUP:
 #    Tools -> Bitmap Display:
 #    Unit Width: 8, Unit Height: 8
@@ -11,8 +11,8 @@
     # Screen dimensions
     SCREEN_WIDTH: .word 64
     SCREEN_HEIGHT: .word 32
-    WORLD_WIDTH: .word 200
-    
+    WORLD_WIDTH: .word 300
+   
     # Colors
     COLOR_SKY: .word 0x5C94FC
     COLOR_GROUND: .word 0x8B4513
@@ -22,10 +22,16 @@
     COLOR_GOOMBA: .word 0x8B4513
     COLOR_CLOUD: .word 0xFFFFFF
     COLOR_COIN: .word 0xFFD700
-    
+    COLOR_PIPE: .word 0x00AA00
+    COLOR_PIPE_DARK: .word 0x008800
+    COLOR_CASTLE: .word 0x808080
+    COLOR_CASTLE_DARK: .word 0x404040
+    COLOR_FLAG_POLE: .word 0x404040
+    COLOR_FLAG: .word 0xFF0000
+   
     # Camera
     camera_x: .word 0
-    
+   
     # Game state
     mario_x: .word 5
     mario_y: .word 25
@@ -35,15 +41,15 @@
     mario_lives: .word 3
     score: .word 0
     coins: .word 0
-    
+   
     # Mario dimensions
     MARIO_WIDTH: .word 2
     MARIO_HEIGHT: .word 3
-    
+   
     # Ground level
     GROUND_Y: .word 28
     GROUND_HEIGHT: .word 4
-    
+   
     # Physics
     GRAVITY: .word 1
     JUMP_VELOCITY: .word -7
@@ -52,55 +58,110 @@
     ACCELERATION: .word 1
     MAX_SPEED: .word 2
     FRICTION: .word 1
-    
-    # Platforms (x, y, width, height) - world coordinates
+   
+    # Platforms (x, y, width, height) - REORGANIZED to avoid collisions
     platforms: .word
-        18, 18, 12, 2,
-        45, 20, 10, 2,
-        70, 16, 14, 2,
-        95, 22, 8, 2,
-        120, 18, 12, 2,
-        145, 15, 10, 2,
-        170, 20, 12, 2,
+        18, 20, 10, 2,      # Platform 1 - early game
+        45, 18, 8, 2,       # Platform 2
+        85, 20, 10, 2,      # Platform 3 - after gap
+        100, 16, 8, 2,      # Platform 4 - higher
+        135, 19, 10, 2,     # Platform 5 - mid game
+        155, 15, 8, 2,      # Platform 6 - higher
+        200, 20, 8, 2,      # Platform 7 - late game
+        220, 17, 8, 2,      # Platform 8
         -1, -1, -1, -1
-    
+   
+    # Ground segments (x_start, x_end) - with GAPS
+    ground_segments: .word
+        0, 65,              # Start area
+        80, 120,            # After first gap
+        130, 180,           # Mid section
+        195, 245,           # Late section
+        258, 300,           # Castle island
+        -1, -1
+   
+    # Pipes (x, y, width, height) - REORGANIZED to avoid collisions
+    pipes: .word
+        60, 23, 4, 5,       # Pipe 1 - end of first section
+        115, 23, 4, 5,      # Pipe 2 - near gap
+        175, 23, 4, 5,      # Pipe 3 - end of mid section
+        240, 23, 4, 5,      # Pipe 4 - before castle island
+        -1, -1, -1, -1
+   
     # Goombas (x, alive, direction, patrol_left, patrol_right)
     goombas: .word
-        45, 1, 1, 35, 60,
-        80, 1, -1, 68, 85,
-        130, 1, 1, 118, 145,
+        35, 1, 1, 25, 55,       # Goomba 1 - early
+        90, 1, -1, 82, 110,     # Goomba 2 - after gap
+        145, 1, 1, 132, 170,    # Goomba 3 - mid
+        210, 1, -1, 197, 235,   # Goomba 4 - late
+        265, 1, 1, 260, 275,    # Goomba 5 - castle area
         -1, -1, -1, -1, -1
-    
+   
     goomba_move_counter: .word 0
     goomba_move_delay: .word 3
-    
+   
     GOOMBA_WIDTH: .word 3
     GOOMBA_HEIGHT: .word 3
-    
-    # Coins (x, y, collected) - world coordinates
+   
+    # Coins (x, y, collected) - ORGANIZED: only on platforms and ground
     coins_data: .word
-        20, 15, 0,
-        25, 15, 0,
-        30, 15, 0,
-        50, 17, 0,
-        75, 13, 0,
-        100, 19, 0,
-        125, 15, 0,
-        150, 12, 0,
-        175, 17, 0,
-        190, 20, 0,
+        # On platform 1
+        20, 17, 0,
+        25, 17, 0,
+        # On ground segment 1
+        30, 25, 0,
+        40, 25, 0,
+        # On platform 2
+        47, 15, 0,
+        52, 15, 0,
+        # On ground segment 2
+        85, 25, 0,
+        95, 25, 0,
+        # On platform 3
+        87, 17, 0,
+        92, 17, 0,
+        # On platform 4
+        102, 13, 0,
+        106, 13, 0,
+        # On ground segment 3
+        140, 25, 0,
+        150, 25, 0,
+        # On platform 5
+        137, 16, 0,
+        142, 16, 0,
+        # On platform 6
+        157, 12, 0,
+        161, 12, 0,
+        # On ground segment 4
+        205, 25, 0,
+        215, 25, 0,
+        # On platform 7
+        202, 17, 0,
+        206, 17, 0,
+        # On platform 8
+        222, 14, 0,
+        226, 14, 0,
+        # Castle area - only 4 coins before castle
+        262, 25, 0,
+        266, 25, 0,
+        270, 25, 0,
+        274, 25, 0,
         -1, -1, -1
-    
+   
     COIN_WIDTH: .word 2
     COIN_HEIGHT: .word 2
-    
+   
+    # Castle position
+    CASTLE_X: .word 282
+    CASTLE_Y: .word 18
+    CASTLE_WIDTH: .word 12
+    CASTLE_HEIGHT: .word 10
+   
+    FLAG_X: .word 278
+    FLAG_POLE_HEIGHT: .word 15
+   
     # Messages
-    msg_lives: .asciiz "Lives: "
-    msg_score: .asciiz " Score: "
-    msg_coins: .asciiz " Coins: "
-    msg_start: .asciiz "\nSUPER MARIO SCROLLING - Press SPACE to start\nCollect coins and avoid Goombas!\n"
-    msg_gameover: .asciiz "\n\nGAME OVER\n"
-    msg_win: .asciiz "\n\nYOU WIN! Reached the end!\n"
+    msg_start: .asciiz "\nSUPER MARIO SCROLLING - Press SPACE to start\nCollect coins and avoid Goombas!\nReach the castle to win!\n"
 
 .text
 .globl main
@@ -108,38 +169,37 @@
 main:
     jal clear_screen
     jal show_start_screen
-    
+   
 wait_for_start:
     li $t0, 0xffff0000
     lw $t1, 0($t0)
     andi $t1, $t1, 1
     beqz $t1, wait_for_start
-    
+   
     lw $t1, 4($t0)
     li $t2, 0x20
     bne $t1, $t2, wait_for_start
 
-# ==================== MAIN GAME LOOP ====================
 game_loop:
     lw $t0, mario_lives
     blez $t0, game_over
-    
-    # Check win condition (reached end of world)
+   
     lw $t0, mario_x
-    li $t1, 195
+    lw $t1, CASTLE_X
     bge $t0, $t1, game_win
-    
+   
     jal process_input
     jal update_mario_physics
     jal update_camera
     jal update_goombas
     jal check_goomba_collisions
     jal check_coin_collisions
+    jal check_pit_death
     jal render_frame
-    
+   
     li $a0, 10
     jal delay
-    
+   
     j game_loop
 
 game_win:
@@ -148,13 +208,13 @@ game_win:
 
 game_over:
     jal show_game_over_screen_visual
-    
+   
 wait_for_restart:
     li $t0, 0xffff0000
     lw $t1, 0($t0)
     andi $t1, $t1, 1
     beqz $t1, wait_for_restart
-    
+   
     lw $t1, 4($t0)
     li $t2, 0x20
     beq $t1, $t2, reset_game
@@ -177,7 +237,7 @@ reset_game:
     sw $zero, coins
     sw $zero, camera_x
     sw $zero, goomba_move_counter
-    
+   
     # Reset goombas
     la $t0, goombas
 reset_goombas_loop:
@@ -188,7 +248,7 @@ reset_goombas_loop:
     sw $t3, 4($t0)
     addi $t0, $t0, 20
     j reset_goombas_loop
-    
+   
 reset_coins_start:
     # Reset coins
     la $t0, coins_data
@@ -199,7 +259,7 @@ reset_coins_loop:
     sw $zero, 8($t0)
     addi $t0, $t0, 12
     j reset_coins_loop
-    
+   
 reset_done:
     j main
 
@@ -207,39 +267,49 @@ exit_program:
     li $v0, 10
     syscall
 
-# ==================== CAMERA UPDATE ====================
+check_pit_death:
+    addi $sp, $sp, -4
+    sw $ra, 0($sp)
+   
+    lw $t0, mario_y
+    li $t1, 32
+    blt $t0, $t1, pit_check_done
+   
+    jal mario_hit
+
+pit_check_done:
+    lw $ra, 0($sp)
+    addi $sp, $sp, 4
+    jr $ra
+
 update_camera:
     addi $sp, $sp, -4
     sw $ra, 0($sp)
-    
+   
     lw $t0, mario_x
     lw $t1, camera_x
-    
-    # Camera follows Mario when he's past x=40 on screen
+   
     sub $t2, $t0, $t1
     li $t3, 40
     ble $t2, $t3, camera_bounds_check
-    
-    # Move camera to keep Mario at x=40 on screen
+   
     sub $t1, $t0, $t3
-    
+   
 camera_bounds_check:
-    # Don't let camera go below 0
     bltz $t1, camera_clamp_left
-    
-    # Don't let camera show past world end
+   
     lw $t4, WORLD_WIDTH
     li $t5, 64
     sub $t4, $t4, $t5
     bgt $t1, $t4, camera_clamp_right
-    
+   
     sw $t1, camera_x
     j camera_done
-    
+   
 camera_clamp_left:
     sw $zero, camera_x
     j camera_done
-    
+   
 camera_clamp_right:
     sw $t4, camera_x
 
@@ -248,40 +318,39 @@ camera_done:
     addi $sp, $sp, 4
     jr $ra
 
-# ==================== INPUT PROCESSING ====================
 process_input:
     addi $sp, $sp, -4
     sw $ra, 0($sp)
-    
+   
     li $s0, 0
-    
+   
     li $t0, 0xffff0000
     lw $t1, 0($t0)
     andi $t1, $t1, 1
     beqz $t1, apply_friction
-    
+   
     lw $t2, 4($t0)
-    
+   
     li $t3, 0x61
     beq $t2, $t3, move_left
     li $t3, 0x41
     beq $t2, $t3, move_left
-    
+   
     li $t3, 0x64
     beq $t2, $t3, move_right
     li $t3, 0x44
     beq $t2, $t3, move_right
-    
+   
     li $t3, 0x77
     beq $t2, $t3, try_jump
     li $t3, 0x57
     beq $t2, $t3, try_jump
     li $t3, 0x20
     beq $t2, $t3, try_jump
-    
+   
     li $t3, 0x1B
     beq $t2, $t3, exit_program
-    
+   
     j apply_friction
 
 move_left:
@@ -289,7 +358,7 @@ move_left:
     lw $t0, mario_vx
     lw $t1, ACCELERATION
     sub $t0, $t0, $t1
-    
+   
     lw $t1, MAX_SPEED
     neg $t2, $t1
     blt $t0, $t2, clamp_left
@@ -304,7 +373,7 @@ move_right:
     lw $t0, mario_vx
     lw $t1, ACCELERATION
     add $t0, $t0, $t1
-    
+   
     lw $t1, MAX_SPEED
     bgt $t0, $t1, clamp_right
     sw $t0, mario_vx
@@ -316,7 +385,7 @@ clamp_right:
 try_jump:
     lw $t0, mario_on_ground
     beqz $t0, apply_friction
-    
+   
     lw $t1, JUMP_VELOCITY
     sw $t1, mario_vy
     sw $zero, mario_on_ground
@@ -329,22 +398,22 @@ apply_friction:
 do_friction:
     lw $t0, mario_vx
     beqz $t0, input_done
-    
+   
     lw $t1, FRICTION
     bgtz $t0, friction_right
-    
+   
 friction_left:
     add $t0, $t0, $t1
     bgtz $t0, friction_stop
     sw $t0, mario_vx
     j input_done
-    
+   
 friction_right:
     sub $t0, $t0, $t1
     bltz $t0, friction_stop
     sw $t0, mario_vx
     j input_done
-    
+   
 friction_stop:
     sw $zero, mario_vx
 
@@ -353,63 +422,55 @@ input_done:
     addi $sp, $sp, 4
     jr $ra
 
-# ==================== MARIO PHYSICS ====================
 update_mario_physics:
     addi $sp, $sp, -8
     sw $ra, 0($sp)
     sw $s0, 4($sp)
-    
+   
     lw $s0, mario_y
-    
+   
     lw $t0, mario_vy
     lw $t1, GRAVITY
     add $t0, $t0, $t1
-    
+   
     lw $t1, MAX_FALL_SPEED
     blt $t0, $t1, vy_ok
     move $t0, $t1
 vy_ok:
     sw $t0, mario_vy
-    
+   
     lw $t1, mario_y
     add $t1, $t1, $t0
     sw $t1, mario_y
-    
+   
     lw $t0, mario_vx
     lw $t1, mario_x
     add $t1, $t1, $t0
-    
+   
     bltz $t1, clamp_x_left
     lw $t2, WORLD_WIDTH
     addi $t2, $t2, -2
     bge $t1, $t2, clamp_x_right
     sw $t1, mario_x
-    j check_platforms
-    
+    j check_pipes
+   
 clamp_x_left:
     sw $zero, mario_x
     sw $zero, mario_vx
-    j check_platforms
-    
+    j check_pipes
+   
 clamp_x_right:
     sw $t2, mario_x
     sw $zero, mario_vx
 
+check_pipes:
+    jal check_pipe_collisions
+
 check_platforms:
     move $a0, $s0
     jal check_platform_collisions
-    
-    lw $t0, mario_y
-    lw $t1, MARIO_HEIGHT
-    add $t0, $t0, $t1
-    lw $t2, GROUND_Y
-    blt $t0, $t2, physics_done
-    
-    sub $t3, $t2, $t1
-    sw $t3, mario_y
-    sw $zero, mario_vy
-    li $t4, 1
-    sw $t4, mario_on_ground
+   
+    jal check_ground_collision
 
 physics_done:
     lw $ra, 0($sp)
@@ -417,7 +478,150 @@ physics_done:
     addi $sp, $sp, 8
     jr $ra
 
-# ==================== PLATFORM COLLISIONS ====================
+check_ground_collision:
+    addi $sp, $sp, -8
+    sw $ra, 0($sp)
+    sw $s0, 4($sp)
+   
+    lw $t0, mario_y
+    lw $t1, MARIO_HEIGHT
+    add $t0, $t0, $t1
+    lw $t2, GROUND_Y
+   
+    blt $t0, $t2, check_if_falling_off_ground
+   
+    lw $t3, mario_x
+    move $a0, $t3
+    jal is_on_ground_segment
+   
+    beqz $v0, check_if_falling_off_ground
+   
+    lw $t2, GROUND_Y
+    lw $t1, MARIO_HEIGHT
+    sub $t3, $t2, $t1
+    sw $t3, mario_y
+    sw $zero, mario_vy
+    li $t4, 1
+    sw $t4, mario_on_ground
+    j ground_collision_done
+
+check_if_falling_off_ground:
+    lw $t0, mario_on_ground
+    beqz $t0, ground_collision_done
+   
+    lw $t3, mario_x
+    move $a0, $t3
+    jal is_on_ground_segment
+   
+    bnez $v0, ground_collision_done
+   
+    sw $zero, mario_on_ground
+
+ground_collision_done:
+    lw $ra, 0($sp)
+    lw $s0, 4($sp)
+    addi $sp, $sp, 8
+    jr $ra
+
+is_on_ground_segment:
+    addi $sp, $sp, -12
+    sw $ra, 0($sp)
+    sw $s0, 4($sp)
+    sw $s1, 8($sp)
+   
+    move $t3, $a0
+    la $s0, ground_segments
+   
+check_segment_loop:
+    lw $s1, 0($s0)
+    li $t0, -1
+    beq $s1, $t0, no_ground_found
+   
+    lw $t1, 4($s0)
+   
+    blt $t3, $s1, next_segment
+    bge $t3, $t1, next_segment
+   
+    li $v0, 1
+    j ground_segment_done
+
+next_segment:
+    addi $s0, $s0, 8
+    j check_segment_loop
+
+no_ground_found:
+    li $v0, 0
+
+ground_segment_done:
+    lw $ra, 0($sp)
+    lw $s0, 4($sp)
+    lw $s1, 8($sp)
+    addi $sp, $sp, 12
+    jr $ra
+
+check_pipe_collisions:
+    addi $sp, $sp, -20
+    sw $ra, 0($sp)
+    sw $s0, 4($sp)
+    sw $s1, 8($sp)
+    sw $s2, 12($sp)
+    sw $s3, 16($sp)
+   
+    la $s0, pipes
+   
+pipe_loop:
+    lw $s1, 0($s0)
+    li $t0, -1
+    beq $s1, $t0, pipes_done
+   
+    lw $s2, 4($s0)
+    lw $s3, 8($s0)
+   
+    lw $t0, mario_x
+    lw $t1, MARIO_WIDTH
+    add $t2, $t0, $t1
+   
+    add $t3, $s1, $s3
+   
+    bge $t0, $t3, next_pipe
+    ble $t2, $s1, next_pipe
+   
+    lw $t0, mario_y
+    lw $t1, MARIO_HEIGHT
+    add $t2, $t0, $t1
+   
+    lw $t4, 12($s0)
+    add $t3, $s2, $t4
+   
+    bge $t0, $t3, next_pipe
+    ble $t2, $s2, next_pipe
+   
+    lw $t5, mario_vx
+    bgtz $t5, push_left
+   
+push_right:
+    sw $t3, mario_x
+    sw $zero, mario_vx
+    j next_pipe
+   
+push_left:
+    sub $t6, $s1, $t1
+    sw $t6, mario_x
+    sw $zero, mario_vx
+
+next_pipe:
+    addi $s0, $s0, 16
+    j pipe_loop
+
+pipes_done:
+    lw $ra, 0($sp)
+    lw $s0, 4($sp)
+    lw $s1, 8($sp)
+    lw $s2, 12($sp)
+    lw $s3, 16($sp)
+    addi $sp, $sp, 20
+    jr $ra
+
 check_platform_collisions:
     addi $sp, $sp, -24
     sw $ra, 0($sp)
@@ -426,27 +630,27 @@ check_platform_collisions:
     sw $s2, 12($sp)
     sw $s3, 16($sp)
     sw $s4, 20($sp)
-    
+   
     move $s4, $a0
     la $s0, platforms
-    
+   
 platform_loop:
     lw $s1, 0($s0)
     li $t0, -1
     beq $s1, $t0, platform_check_done
-    
+   
     lw $s2, 4($s0)
     lw $s3, 8($s0)
-    
+   
     lw $t0, mario_x
     lw $t1, MARIO_WIDTH
     add $t2, $t0, $t1
-    
+   
     add $t3, $s1, $s3
-    
+   
     bge $t0, $t3, next_platform
     ble $t2, $s1, next_platform
-    
+   
     lw $t0, mario_vy
     bgtz $t0, check_platform_landing
     bltz $t0, check_platform_bottom
@@ -456,16 +660,16 @@ check_platform_landing:
     lw $t1, mario_y
     lw $t2, MARIO_HEIGHT
     add $t1, $t1, $t2
-    
+   
     add $t3, $s4, $t2
-    
+   
     blt $t1, $s2, next_platform
     bgt $t3, $s2, next_platform
-    
+   
     sub $t4, $t1, $s2
     li $t5, 5
     bgt $t4, $t5, next_platform
-    
+   
     sub $t1, $s2, $t2
     sw $t1, mario_y
     sw $zero, mario_vy
@@ -476,15 +680,15 @@ check_platform_landing:
 check_platform_bottom:
     lw $t4, 12($s0)
     add $t1, $s2, $t4
-    
+   
     lw $t2, mario_y
     bgt $t2, $t1, next_platform
     blt $s4, $t1, next_platform
-    
+   
     sub $t3, $t1, $t2
     li $t5, 5
     bgt $t3, $t5, next_platform
-    
+   
     sw $t1, mario_y
     sw $zero, mario_vy
     sw $zero, mario_on_ground
@@ -495,17 +699,6 @@ next_platform:
     j platform_loop
 
 platform_check_done:
-    lw $t0, mario_y
-    lw $t1, MARIO_HEIGHT
-    add $t0, $t0, $t1
-    lw $t2, GROUND_Y
-    blt $t0, $t2, set_in_air
-    j platforms_done
-
-set_in_air:
-    sw $zero, mario_on_ground
-
-platforms_done:
     lw $ra, 0($sp)
     lw $s0, 4($sp)
     lw $s1, 8($sp)
@@ -515,56 +708,83 @@ platforms_done:
     addi $sp, $sp, 24
     jr $ra
 
-# ==================== GOOMBA UPDATE ====================
+# ==================== GOOMBA UPDATE (WITH PIPE COLLISION) ====================
 update_goombas:
     addi $sp, $sp, -8
     sw $ra, 0($sp)
     sw $s0, 4($sp)
-    
+   
     lw $t0, goomba_move_counter
     addi $t0, $t0, 1
     lw $t1, goomba_move_delay
-    
+   
     blt $t0, $t1, save_counter
     sw $zero, goomba_move_counter
-    
+   
     la $s0, goombas
-    
+   
 update_goomba_loop:
     lw $t0, 0($s0)
     li $t1, -1
     beq $t0, $t1, goombas_done
-    
+   
     lw $t1, 4($s0)
     beqz $t1, next_goomba
-    
+   
     lw $t2, 8($s0)
     lw $t3, 12($s0)
     lw $t4, 16($s0)
-    
-    bgtz $t2, move_goomba_right
-    
-move_goomba_left:
-    addi $t0, $t0, -1
-    ble $t0, $t3, reverse_goomba_right
-    j save_goomba_pos
+   
+    # Calculate new position
+    move $t5, $t0
+    bgtz $t2, calc_goomba_right
+   
+calc_goomba_left:
+    addi $t5, $t5, -1
+    ble $t5, $t3, reverse_goomba_right
+    j check_goomba_pipe_collision
 
-move_goomba_right:
-    addi $t0, $t0, 1
-    bge $t0, $t4, reverse_goomba_left
-    j save_goomba_pos
+calc_goomba_right:
+    addi $t5, $t5, 1
+    bge $t5, $t4, reverse_goomba_left
+    j check_goomba_pipe_collision
+
+check_goomba_pipe_collision:
+    # Check if new position collides with any pipe
+    move $a0, $t5          # new_x
+    move $a1, $t0          # current_x
+    jal goomba_pipe_collision
+   
+    beqz $v0, save_goomba_pos  # No collision, save position
+   
+    # Collision detected, reverse direction
+    lw $t2, 8($s0)
+    bgtz $t2, force_reverse_left
+   
+force_reverse_right:
+    li $t2, 1
+    sw $t2, 8($s0)
+    j next_goomba
+   
+force_reverse_left:
+    li $t2, -1
+    sw $t2, 8($s0)
+    j next_goomba
 
 reverse_goomba_left:
     li $t2, -1
     sw $t2, 8($s0)
+    move $t5, $t0
     j save_goomba_pos
 
 reverse_goomba_right:
     li $t2, 1
     sw $t2, 8($s0)
+    move $t5, $t0
+    j save_goomba_pos
 
 save_goomba_pos:
-    sw $t0, 0($s0)
+    sw $t5, 0($s0)
 
 next_goomba:
     addi $s0, $s0, 20
@@ -579,47 +799,106 @@ goombas_done:
     addi $sp, $sp, 8
     jr $ra
 
-# ==================== GOOMBA COLLISIONS ====================
+# ==================== GOOMBA-PIPE COLLISION CHECK ====================
+# Input: $a0 = new_x, $a1 = current_x
+# Output: $v0 = 1 if collision, 0 if no collision
+goomba_pipe_collision:
+    addi $sp, $sp, -16
+    sw $ra, 0($sp)
+    sw $s0, 4($sp)
+    sw $s1, 8($sp)
+    sw $s2, 12($sp)
+   
+    move $s1, $a0  # new_x
+    move $s2, $a1  # current_x
+   
+    la $s0, pipes
+   
+gpc_pipe_loop:
+    lw $t0, 0($s0)
+    li $t1, -1
+    beq $t0, $t1, gpc_no_collision
+   
+    lw $t1, 8($s0)  # pipe width
+    add $t2, $t0, $t1  # pipe_right
+   
+    # Goomba bounds
+    lw $t3, GOOMBA_WIDTH
+    add $t4, $s1, $t3  # goomba_right
+   
+    # Check horizontal collision
+    bge $s1, $t2, gpc_next_pipe
+    ble $t4, $t0, gpc_next_pipe
+   
+    # Collision detected
+    li $v0, 1
+    j gpc_done
+
+gpc_next_pipe:
+    addi $s0, $s0, 16
+    j gpc_pipe_loop
+
+gpc_no_collision:
+    li $v0, 0
+
+gpc_done:
+    lw $ra, 0($sp)
+    lw $s0, 4($sp)
+    lw $s1, 8($sp)
+    lw $s2, 12($sp)
+    addi $sp, $sp, 16
+    jr $ra
+
 check_goomba_collisions:
     addi $sp, $sp, -12
     sw $ra, 0($sp)
     sw $s0, 4($sp)
     sw $s1, 8($sp)
-    
+   
     la $s0, goombas
-    
+   
 check_goomba_loop:
     lw $s1, 0($s0)
     li $t0, -1
     beq $s1, $t0, goombas_collision_done
-    
+   
     lw $t0, 4($s0)
     beqz $t0, next_goomba_check
-    
+   
     lw $t1, mario_x
     lw $t2, MARIO_WIDTH
     add $t3, $t1, $t2
-    
+   
     lw $t4, GOOMBA_WIDTH
     add $t5, $s1, $t4
-    
+   
     bge $t1, $t5, next_goomba_check
     ble $t3, $s1, next_goomba_check
-    
+   
     lw $t1, mario_y
     lw $t2, MARIO_HEIGHT
     add $t3, $t1, $t2
-    
+   
     lw $t4, GROUND_Y
     lw $t5, GOOMBA_HEIGHT
     sub $t6, $t4, $t5
-    
-    addi $t7, $t6, -2
-    bge $t1, $t4, next_goomba_check
-    ble $t3, $t7, next_goomba_check
-    
-    bge $t1, $t6, mario_dies_goomba
-    
+   
+    add $t7, $t6, $t5
+    bge $t1, $t7, next_goomba_check
+    ble $t3, $t6, next_goomba_check
+   
+    # Check if Mario is stomping (coming from above)
+    lw $t0, mario_vy
+    blez $t0, mario_dies_goomba
+   
+    # Check overlap from top
+    sub $t1, $t3, $t6
+    li $t2, 10
+    blt $t1, $t2, kill_goomba_stomp
+   
+    j mario_dies_goomba
+
+kill_goomba_stomp:
     sw $zero, 4($s0)
     lw $t0, score
     addi $t0, $t0, 100
@@ -643,51 +922,50 @@ goombas_collision_done:
     addi $sp, $sp, 12
     jr $ra
 
-# ==================== COIN COLLISIONS ====================
 check_coin_collisions:
     addi $sp, $sp, -8
     sw $ra, 0($sp)
     sw $s0, 4($sp)
-    
+   
     la $s0, coins_data
-    
+   
 check_coin_loop:
     lw $t0, 0($s0)
     li $t1, -1
     beq $t0, $t1, coins_collision_done
-    
+   
     lw $t1, 8($s0)
     bnez $t1, next_coin
-    
+   
     lw $t1, 4($s0)
-    
+   
     lw $t2, mario_x
     lw $t3, MARIO_WIDTH
     add $t4, $t2, $t3
-    
+   
     lw $t5, COIN_WIDTH
     add $t6, $t0, $t5
-    
+   
     bgt $t2, $t6, next_coin
     blt $t4, $t0, next_coin
-    
+   
     lw $t2, mario_y
     lw $t3, MARIO_HEIGHT
     add $t4, $t2, $t3
-    
+   
     lw $t5, COIN_HEIGHT
     add $t6, $t1, $t5
-    
+   
     bgt $t2, $t6, next_coin
     blt $t4, $t1, next_coin
-    
+   
     li $t7, 1
     sw $t7, 8($s0)
-    
+   
     lw $t0, coins
     addi $t0, $t0, 1
     sw $t0, coins
-    
+   
     lw $t0, score
     addi $t0, $t0, 10
     sw $t0, score
@@ -702,17 +980,16 @@ coins_collision_done:
     addi $sp, $sp, 8
     jr $ra
 
-# ==================== MARIO HIT ====================
 mario_hit:
     addi $sp, $sp, -4
     sw $ra, 0($sp)
-    
+   
     lw $t0, mario_lives
     addi $t0, $t0, -1
     sw $t0, mario_lives
-    
+   
     blez $t0, hit_done
-    
+   
     li $t1, 5
     sw $t1, mario_x
     li $t1, 25
@@ -722,7 +999,7 @@ mario_hit:
     li $t1, 1
     sw $t1, mario_on_ground
     sw $zero, camera_x
-    
+   
     li $a0, 50
     jal delay
 
@@ -735,14 +1012,17 @@ hit_done:
 render_frame:
     addi $sp, $sp, -4
     sw $ra, 0($sp)
-    
+   
     jal clear_screen
     jal draw_ground
     jal draw_platforms
+    jal draw_pipes
+    jal draw_castle
+    jal draw_flag
     jal draw_coins
     jal draw_mario
     jal draw_goombas
-    
+   
     lw $ra, 0($sp)
     addi $sp, $sp, 4
     jr $ra
@@ -750,34 +1030,63 @@ render_frame:
 clear_screen:
     addi $sp, $sp, -4
     sw $ra, 0($sp)
-    
+   
     li $t0, 0x10008000
     lw $t1, COLOR_SKY
     li $t2, 2048
-    
+   
 clear_loop:
     sw $t1, 0($t0)
     addi $t0, $t0, 4
     addi $t2, $t2, -1
     bgtz $t2, clear_loop
-    
+   
     lw $ra, 0($sp)
     addi $sp, $sp, 4
     jr $ra
 
 draw_ground:
-    addi $sp, $sp, -4
+    addi $sp, $sp, -16
     sw $ra, 0($sp)
-    
-    li $a0, 0
+    sw $s0, 4($sp)
+    sw $s1, 8($sp)
+    sw $s2, 12($sp)
+   
+    la $s0, ground_segments
+   
+draw_ground_loop:
+    lw $s1, 0($s0)
+    li $t0, -1
+    beq $s1, $t0, ground_done
+   
+    lw $s2, 4($s0)
+   
+    lw $t0, camera_x
+    sub $a0, $s1, $t0
+   
+    sub $t1, $s2, $s1
+    move $a2, $t1
+   
+    li $t2, -100
+    blt $a0, $t2, skip_ground_segment
+    li $t2, 64
+    bge $a0, $t2, skip_ground_segment
+   
     lw $a1, GROUND_Y
-    li $a2, 64
     lw $a3, GROUND_HEIGHT
     lw $t0, COLOR_GROUND
     jal fill_rect
-    
+
+skip_ground_segment:
+    addi $s0, $s0, 8
+    j draw_ground_loop
+
+ground_done:
     lw $ra, 0($sp)
-    addi $sp, $sp, 4
+    lw $s0, 4($sp)
+    lw $s1, 8($sp)
+    lw $s2, 12($sp)
+    addi $sp, $sp, 16
     jr $ra
 
 draw_platforms:
@@ -786,22 +1095,22 @@ draw_platforms:
     sw $s0, 4($sp)
     sw $s1, 8($sp)
     sw $s2, 12($sp)
-    
+   
     la $s0, platforms
-    
+   
 draw_platform_loop:
     lw $s1, 0($s0)
     li $t0, -1
     beq $s1, $t0, platforms_draw_done
-    
+   
     lw $t0, camera_x
     sub $a0, $s1, $t0
-    
+   
     li $t1, -16
     blt $a0, $t1, skip_platform
     li $t1, 64
     bge $a0, $t1, skip_platform
-    
+   
     lw $a1, 4($s0)
     lw $a2, 8($s0)
     lw $a3, 12($s0)
@@ -820,29 +1129,205 @@ platforms_draw_done:
     addi $sp, $sp, 16
     jr $ra
 
+draw_pipes:
+    addi $sp, $sp, -16
+    sw $ra, 0($sp)
+    sw $s0, 4($sp)
+    sw $s1, 8($sp)
+    sw $s2, 12($sp)
+   
+    la $s0, pipes
+   
+draw_pipe_loop:
+    lw $s1, 0($s0)
+    li $t0, -1
+    beq $s1, $t0, pipes_draw_done
+   
+    lw $t0, camera_x
+    sub $a0, $s1, $t0
+   
+    li $t1, -10
+    blt $a0, $t1, skip_pipe
+    li $t1, 64
+    bge $a0, $t1, skip_pipe
+   
+    lw $a1, 4($s0)
+    lw $a2, 8($s0)
+    lw $a3, 12($s0)
+    lw $t0, COLOR_PIPE
+    jal fill_rect
+   
+    lw $t0, camera_x
+    sub $a0, $s1, $t0
+    addi $a0, $a0, -1
+    lw $a1, 4($s0)
+    addi $a1, $a1, -1
+    lw $t1, 8($s0)
+    addi $a2, $t1, 2
+    li $a3, 2
+    lw $t0, COLOR_PIPE_DARK
+    jal fill_rect
+   
+    lw $t0, camera_x
+    sub $a0, $s1, $t0
+    lw $a1, 4($s0)
+    li $a2, 1
+    lw $a3, 12($s0)
+    lw $t0, COLOR_PIPE_DARK
+    jal fill_rect
+
+skip_pipe:
+    addi $s0, $s0, 16
+    j draw_pipe_loop
+
+pipes_draw_done:
+    lw $ra, 0($sp)
+    lw $s0, 4($sp)
+    lw $s1, 8($sp)
+    lw $s2, 12($sp)
+    addi $sp, $sp, 16
+    jr $ra
+
+draw_castle:
+    addi $sp, $sp, -4
+    sw $ra, 0($sp)
+   
+    lw $t0, CASTLE_X
+    lw $t1, camera_x
+    sub $a0, $t0, $t1
+   
+    li $t2, -20
+    blt $a0, $t2, castle_done
+    li $t2, 64
+    bge $a0, $t2, castle_done
+   
+    lw $a1, CASTLE_Y
+    lw $a2, CASTLE_WIDTH
+    lw $a3, CASTLE_HEIGHT
+    lw $t0, COLOR_CASTLE
+    jal fill_rect
+   
+    lw $t0, CASTLE_X
+    lw $t1, camera_x
+    sub $a0, $t0, $t1
+    lw $a1, CASTLE_Y
+    addi $a1, $a1, -3
+    li $a2, 3
+    li $a3, 13
+    lw $t0, COLOR_CASTLE_DARK
+    jal fill_rect
+   
+    lw $t0, CASTLE_X
+    lw $t1, camera_x
+    sub $a0, $t0, $t1
+    addi $a0, $a0, 9
+    lw $a1, CASTLE_Y
+    addi $a1, $a1, -3
+    li $a2, 3
+    li $a3, 13
+    lw $t0, COLOR_CASTLE_DARK
+    jal fill_rect
+   
+    lw $t0, CASTLE_X
+    lw $t1, camera_x
+    sub $a0, $t0, $t1
+    addi $a0, $a0, 4
+    lw $a1, CASTLE_Y
+    addi $a1, $a1, 5
+    li $a2, 4
+    li $a3, 5
+    li $t0, 0x000000
+    jal fill_rect
+   
+    lw $t0, CASTLE_X
+    lw $t1, camera_x
+    sub $a0, $t0, $t1
+    addi $a0, $a0, 1
+    lw $a1, CASTLE_Y
+    addi $a1, $a1, -1
+    li $a2, 1
+    li $a3, 1
+    li $t0, 0xFFFF00
+    jal fill_rect
+   
+    lw $t0, CASTLE_X
+    lw $t1, camera_x
+    sub $a0, $t0, $t1
+    addi $a0, $a0, 10
+    lw $a1, CASTLE_Y
+    addi $a1, $a1, -1
+    li $a2, 1
+    li $a3, 1
+    li $t0, 0xFFFF00
+    jal fill_rect
+
+castle_done:
+    lw $ra, 0($sp)
+    addi $sp, $sp, 4
+    jr $ra
+
+draw_flag:
+    addi $sp, $sp, -4
+    sw $ra, 0($sp)
+   
+    lw $t0, FLAG_X
+    lw $t1, camera_x
+    sub $a0, $t0, $t1
+   
+    li $t2, -5
+    blt $a0, $t2, flag_done
+    li $t2, 64
+    bge $a0, $t2, flag_done
+   
+    lw $t3, GROUND_Y
+    lw $t4, FLAG_POLE_HEIGHT
+    sub $a1, $t3, $t4
+    li $a2, 1
+    move $a3, $t4
+    lw $t0, COLOR_FLAG_POLE
+    jal fill_rect
+   
+    lw $t0, FLAG_X
+    lw $t1, camera_x
+    sub $a0, $t0, $t1
+    addi $a0, $a0, 1
+    lw $t3, GROUND_Y
+    lw $t4, FLAG_POLE_HEIGHT
+    sub $a1, $t3, $t4
+    addi $a1, $a1, 2
+    li $a2, 4
+    li $a3, 3
+    lw $t0, COLOR_FLAG
+    jal fill_rect
+
+flag_done:
+    lw $ra, 0($sp)
+    addi $sp, $sp, 4
+    jr $ra
+
 draw_coins:
     addi $sp, $sp, -8
     sw $ra, 0($sp)
     sw $s0, 4($sp)
-    
+   
     la $s0, coins_data
-    
+   
 draw_coin_loop:
     lw $t0, 0($s0)
     li $t1, -1
     beq $t0, $t1, coins_draw_done
-    
+   
     lw $t1, 8($s0)
     bnez $t1, skip_coin
-    
+   
     lw $t1, camera_x
     sub $a0, $t0, $t1
-    
+   
     li $t2, -3
     blt $a0, $t2, skip_coin
     li $t2, 64
     bge $a0, $t2, skip_coin
-    
+   
     lw $a1, 4($s0)
     lw $a2, COIN_WIDTH
     lw $a3, COIN_HEIGHT
@@ -862,26 +1347,26 @@ coins_draw_done:
 draw_mario:
     addi $sp, $sp, -4
     sw $ra, 0($sp)
-    
+   
     lw $t0, mario_x
     lw $t1, camera_x
     sub $s0, $t0, $t1
     lw $s1, mario_y
-    
+   
     move $a0, $s0
     addi $a1, $s1, 1
     li $a2, 2
     li $a3, 2
     lw $t0, COLOR_MARIO_RED
     jal fill_rect
-    
+   
     move $a0, $s0
     move $a1, $s1
     li $a2, 2
     li $a3, 1
     lw $t0, COLOR_MARIO_SKIN
     jal fill_rect
-    
+   
     lw $ra, 0($sp)
     addi $sp, $sp, 4
     jr $ra
@@ -890,34 +1375,34 @@ draw_goombas:
     addi $sp, $sp, -8
     sw $ra, 0($sp)
     sw $s0, 4($sp)
-    
+   
     la $s0, goombas
-    
+   
 draw_goomba_loop:
     lw $t0, 0($s0)
     li $t1, -1
     beq $t0, $t1, goombas_draw_done
-    
+   
     lw $t1, 4($s0)
     beqz $t1, skip_goomba
-    
+   
     lw $t1, camera_x
     sub $a0, $t0, $t1
-    
+   
     li $t2, -4
     blt $a0, $t2, skip_goomba
     li $t2, 64
     bge $a0, $t2, skip_goomba
-    
+   
     lw $t3, GROUND_Y
     lw $t4, GOOMBA_HEIGHT
     sub $a1, $t3, $t4
-    
+   
     li $a2, 3
     li $a3, 3
     lw $t0, COLOR_GOOMBA
     jal fill_rect
-    
+   
     lw $t0, 0($s0)
     lw $t1, camera_x
     sub $t2, $t0, $t1
@@ -929,7 +1414,7 @@ draw_goomba_loop:
     li $a3, 1
     li $t0, 0x000000
     jal fill_rect
-    
+   
     lw $t0, 0($s0)
     lw $t1, camera_x
     sub $t2, $t0, $t1
@@ -959,13 +1444,13 @@ fill_rect:
     sw $s1, 8($sp)
     sw $s2, 12($sp)
     sw $s3, 16($sp)
-    
+   
     move $s0, $a0
     move $s1, $a1
     move $s2, $a2
     move $s3, $a3
     move $t9, $t0
-    
+   
     li $t8, 0
 rect_row:
     bge $t8, $s3, rect_done
@@ -997,7 +1482,7 @@ draw_pixel:
     bge $a0, $t0, pixel_skip
     li $t0, 32
     bge $a1, $t0, pixel_skip
-    
+   
     li $t0, 0x10008000
     sll $t1, $a1, 6
     add $t1, $t1, $a0
@@ -1017,486 +1502,420 @@ show_start_screen:
     addi $sp, $sp, 4
     jr $ra
 
-# ==================== SHOW WIN SCREEN (VISUAL) ====================
 show_win_screen_visual:
     addi $sp, $sp, -4
     sw $ra, 0($sp)
-    
-    # Pintar toda la pantalla de azul cielo
+   
     li $t0, 0x10008000
     lw $t1, COLOR_SKY
     li $t2, 2048
-    
+   
 win_clear:
     sw $t1, 0($t0)
     addi $t0, $t0, 4
     addi $t2, $t2, -1
     bgtz $t2, win_clear
-    
-    # Color amarillo para el texto (como las monedas)
+   
     li $s7, 0xFFD700
-    
-    # ===== LETRA Y (posición x=10, y=8) =====
+   
     li $a0, 10
     li $a1, 8
     li $a2, 1
     li $a3, 5
     move $t0, $s7
     jal fill_rect
-    
+   
     li $a0, 14
     li $a1, 8
     li $a2, 1
     li $a3, 5
     move $t0, $s7
     jal fill_rect
-    
+   
     li $a0, 11
     li $a1, 10
     li $a2, 1
     li $a3, 2
     move $t0, $s7
     jal fill_rect
-    
+   
     li $a0, 13
     li $a1, 10
     li $a2, 1
     li $a3, 2
     move $t0, $s7
     jal fill_rect
-    
+   
     li $a0, 12
     li $a1, 11
     li $a2, 1
     li $a3, 2
     move $t0, $s7
     jal fill_rect
-    
-    # ===== LETRA O (posición x=16, y=8) =====
+   
     li $a0, 16
     li $a1, 8
     li $a2, 4
     li $a3, 5
     move $t0, $s7
     jal fill_rect
-    
+   
     li $a0, 17
     li $a1, 9
     li $a2, 2
     li $a3, 3
-    lw $t0, COLOR_SKY  # Color del cielo
+    lw $t0, COLOR_SKY
     jal fill_rect
-    
-    # ===== LETRA U (posición x=21, y=8) =====
+   
     li $a0, 21
     li $a1, 8
     li $a2, 1
     li $a3, 5
     move $t0, $s7
     jal fill_rect
-    
+   
     li $a0, 24
     li $a1, 8
     li $a2, 1
     li $a3, 5
     move $t0, $s7
     jal fill_rect
-    
+   
     li $a0, 21
     li $a1, 12
     li $a2, 4
     li $a3, 1
     move $t0, $s7
     jal fill_rect
-    
-    # ===== LETRA W (posición x=10, y=15) =====
+   
     li $a0, 10
     li $a1, 15
     li $a2, 1
     li $a3, 5
     move $t0, $s7
     jal fill_rect
-    
+   
     li $a0, 14
     li $a1, 15
     li $a2, 1
     li $a3, 5
     move $t0, $s7
     jal fill_rect
-    
+   
     li $a0, 11
     li $a1, 18
     li $a2, 1
     li $a3, 2
     move $t0, $s7
     jal fill_rect
-    
+   
     li $a0, 13
     li $a1, 18
     li $a2, 1
     li $a3, 2
     move $t0, $s7
     jal fill_rect
-    
+   
     li $a0, 12
     li $a1, 19
     li $a2, 1
     li $a3, 1
     move $t0, $s7
     jal fill_rect
-    
-    # ===== LETRA I (posición x=16, y=15) =====
+   
     li $a0, 18
     li $a1, 15
     li $a2, 1
     li $a3, 5
     move $t0, $s7
     jal fill_rect
-    
-    # ===== LETRA N (posición x=20, y=15) =====
+   
     li $a0, 20
     li $a1, 15
     li $a2, 1
     li $a3, 5
     move $t0, $s7
     jal fill_rect
-    
+   
     li $a0, 24
     li $a1, 15
     li $a2, 1
     li $a3, 5
     move $t0, $s7
     jal fill_rect
-    
+   
     li $a0, 21
     li $a1, 16
     li $a2, 1
     li $a3, 1
     move $t0, $s7
     jal fill_rect
-    
+   
     li $a0, 22
     li $a1, 17
     li $a2, 1
     li $a3, 1
     move $t0, $s7
     jal fill_rect
-    
+   
     li $a0, 23
     li $a1, 18
     li $a2, 1
     li $a3, 1
     move $t0, $s7
     jal fill_rect
-    
-    # Dibujar Mario sonriente en el centro
+   
     li $a0, 28
     li $a1, 20
     li $a2, 2
     li $a3, 2
     lw $t0, COLOR_MARIO_RED
     jal fill_rect
-    
+   
     li $a0, 28
     li $a1, 19
     li $a2, 2
     li $a3, 1
     lw $t0, COLOR_MARIO_SKIN
     jal fill_rect
-    
-    # Mostrar estadísticas en consola
-    li $v0, 4
-    la $a0, msg_win
-    syscall
-    
-    li $v0, 4
-    la $a0, msg_score
-    syscall
-    li $v0, 1
-    lw $a0, score
-    syscall
-    
-    li $v0, 4
-    la $a0, msg_coins
-    syscall
-    li $v0, 1
-    lw $a0, coins
-    syscall
-    
+   
     lw $ra, 0($sp)
     addi $sp, $sp, 4
     jr $ra
 
-# ==================== SHOW GAME OVER SCREEN (VISUAL) ====================
 show_game_over_screen_visual:
     addi $sp, $sp, -4
     sw $ra, 0($sp)
-    
-    # Pintar toda la pantalla de negro
+   
     li $t0, 0x10008000
     li $t1, 0x000000
     li $t2, 2048
-    
+   
 gameover_clear:
     sw $t1, 0($t0)
     addi $t0, $t0, 4
     addi $t2, $t2, -1
     bgtz $t2, gameover_clear
-    
-    # Color rojo para el texto
+   
     li $s7, 0xFF0000
-    
-    # ===== LETRA G (posición x=10, y=12) =====
+   
     li $a0, 10
     li $a1, 12
     li $a2, 4
     li $a3, 5
     move $t0, $s7
     jal fill_rect
-    
+   
     li $a0, 11
     li $a1, 13
     li $a2, 2
     li $a3, 3
     li $t0, 0x000000
     jal fill_rect
-    
+   
     li $a0, 12
     li $a1, 14
     li $a2, 2
     li $a3, 1
     move $t0, $s7
     jal fill_rect
-    
-    # ===== LETRA A (posición x=15, y=12) =====
+   
     li $a0, 15
     li $a1, 12
     li $a2, 1
     li $a3, 5
     move $t0, $s7
     jal fill_rect
-    
+   
     li $a0, 18
     li $a1, 12
     li $a2, 1
     li $a3, 5
     move $t0, $s7
     jal fill_rect
-    
+   
     li $a0, 15
     li $a1, 12
     li $a2, 4
     li $a3, 1
     move $t0, $s7
     jal fill_rect
-    
+   
     li $a0, 15
     li $a1, 14
     li $a2, 4
     li $a3, 1
     move $t0, $s7
     jal fill_rect
-    
-    # ===== LETRA M (posición x=20, y=12) =====
+   
     li $a0, 20
     li $a1, 12
     li $a2, 1
     li $a3, 5
     move $t0, $s7
     jal fill_rect
-    
+   
     li $a0, 24
     li $a1, 12
     li $a2, 1
     li $a3, 5
     move $t0, $s7
     jal fill_rect
-    
+   
     li $a0, 21
     li $a1, 13
     li $a2, 1
     li $a3, 2
     move $t0, $s7
     jal fill_rect
-    
+   
     li $a0, 23
     li $a1, 13
     li $a2, 1
     li $a3, 2
     move $t0, $s7
     jal fill_rect
-    
-    # ===== LETRA E (posición x=26, y=12) =====
+   
     li $a0, 26
     li $a1, 12
     li $a2, 1
     li $a3, 5
     move $t0, $s7
     jal fill_rect
-    
+   
     li $a0, 26
     li $a1, 12
     li $a2, 4
     li $a3, 1
     move $t0, $s7
     jal fill_rect
-    
+   
     li $a0, 26
     li $a1, 14
     li $a2, 3
     li $a3, 1
     move $t0, $s7
     jal fill_rect
-    
+   
     li $a0, 26
     li $a1, 16
     li $a2, 4
     li $a3, 1
     move $t0, $s7
     jal fill_rect
-    
-    # ===== LETRA O (posición x=15, y=19) =====
+   
     li $a0, 15
     li $a1, 19
     li $a2, 4
     li $a3, 5
     move $t0, $s7
     jal fill_rect
-    
+   
     li $a0, 16
     li $a1, 20
     li $a2, 2
     li $a3, 3
     li $t0, 0x000000
     jal fill_rect
-    
-    # ===== LETRA V (posición x=20, y=19) =====
+   
     li $a0, 20
     li $a1, 19
     li $a2, 1
     li $a3, 3
     move $t0, $s7
     jal fill_rect
-    
+   
     li $a0, 24
     li $a1, 19
     li $a2, 1
     li $a3, 3
     move $t0, $s7
     jal fill_rect
-    
+   
     li $a0, 21
     li $a1, 22
     li $a2, 1
     li $a3, 1
     move $t0, $s7
     jal fill_rect
-    
+   
     li $a0, 23
     li $a1, 22
     li $a2, 1
     li $a3, 1
     move $t0, $s7
     jal fill_rect
-    
+   
     li $a0, 22
     li $a1, 23
     li $a2, 1
     li $a3, 1
     move $t0, $s7
     jal fill_rect
-    
-    # ===== LETRA E (posición x=26, y=19) =====
+   
     li $a0, 26
     li $a1, 19
     li $a2, 1
     li $a3, 5
     move $t0, $s7
     jal fill_rect
-    
+   
     li $a0, 26
     li $a1, 19
     li $a2, 4
     li $a3, 1
     move $t0, $s7
     jal fill_rect
-    
+   
     li $a0, 26
     li $a1, 21
     li $a2, 3
     li $a3, 1
     move $t0, $s7
     jal fill_rect
-    
+   
     li $a0, 26
     li $a1, 23
     li $a2, 4
     li $a3, 1
     move $t0, $s7
     jal fill_rect
-    
-    # ===== LETRA R (posición x=31, y=19) =====
+   
     li $a0, 31
     li $a1, 19
     li $a2, 1
     li $a3, 5
     move $t0, $s7
     jal fill_rect
-    
+   
     li $a0, 31
     li $a1, 19
     li $a2, 3
     li $a3, 1
     move $t0, $s7
     jal fill_rect
-    
+   
     li $a0, 31
     li $a1, 21
     li $a2, 3
     li $a3, 1
     move $t0, $s7
     jal fill_rect
-    
+   
     li $a0, 34
     li $a1, 19
     li $a2, 1
     li $a3, 3
     move $t0, $s7
     jal fill_rect
-    
+   
     li $a0, 33
     li $a1, 22
     li $a2, 1
     li $a3, 2
     move $t0, $s7
     jal fill_rect
-    
-    # Mostrar estadísticas en consola
-    li $v0, 4
-    la $a0, msg_gameover
-    syscall
-    
-    li $v0, 4
-    la $a0, msg_lives
-    syscall
-    li $v0, 1
-    lw $a0, mario_lives
-    syscall
-    
-    li $v0, 4
-    la $a0, msg_score
-    syscall
-    li $v0, 1
-    lw $a0, score
-    syscall
-    
-    li $v0, 4
-    la $a0, msg_coins
-    syscall
-    li $v0, 1
-    lw $a0, coins
-    syscall
-    
+   
     lw $ra, 0($sp)
     addi $sp, $sp, 4
     jr $ra
