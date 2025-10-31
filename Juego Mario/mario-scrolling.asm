@@ -46,11 +46,11 @@
     
     # Physics
     GRAVITY: .word 1
-    JUMP_VELOCITY: .word -6
-    BOUNCE_VELOCITY: .word -4
-    MAX_FALL_SPEED: .word 8
+    JUMP_VELOCITY: .word -7
+    BOUNCE_VELOCITY: .word -5
+    MAX_FALL_SPEED: .word 5
     ACCELERATION: .word 1
-    MAX_SPEED: .word 3
+    MAX_SPEED: .word 2
     FRICTION: .word 1
     
     # Platforms (x, y, width, height) - world coordinates
