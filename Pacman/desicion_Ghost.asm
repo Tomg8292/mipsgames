@@ -5,12 +5,12 @@
 	decision_Persigue()
 	j exit
 	huir:
-	decisión_huir()
+	decision_huir()
 	exit:
 .end_macro
 .macro decision_Persigue #s1 x ghost s2 y ghost devuelve el comando s3 s6 valor del vector donde se almacena el comando anterior
-#Sistema: primero elige si moverte en x o y 50/50, luego sigue a Pac-Man 4/5 o ve en la derección opuesta 1/5
-#Solo toma una decisión para una bifurcación
+#Sistema: primero elige si moverte en x o y 50/50, luego sigue a Pac-Man 4/5 o ve en la derecciï¿½n opuesta 1/5
+#Solo toma una decisiï¿½n para una bifurcaciï¿½n
 	bifurcacion()
 	beqz $s4,anterior
 	#Cargar PacMan
@@ -19,7 +19,7 @@
 	lw $t2,4($t0)
 	##
 	comeco:
-	#genera un número aleatorio
+	#genera un nï¿½mero aleatorio
 	li $v0,42
 	li $a1,2
 	syscall
@@ -32,7 +32,7 @@
 	beq $a0,1,segueY
 	beq $a0,2,segueY
 	beq $a0,3,segueY
-	#va en la derección opuesta
+	#va en la derecciï¿½n opuesta
 	bgt $t2,$s2,arriba
 		#abajo
 		addi $s3,$zero,115
@@ -57,7 +57,7 @@
 	beq $a0,1,segue
 	beq $a0,2,segue
 	beq $a0,3,segue
-	#va en la derección opuesta
+	#va en la derecciï¿½n opuesta
 	bgt $t1,$s1,izq
 		#Der
 		addi $s3,$zero,100
@@ -82,14 +82,14 @@
 	j exitfunc
 	########
 	exit:
-	#Si $s3 no es válido, busque otro.
+	#Si $s3 no es vï¿½lido, busque otro.
 	next_Block()
 	beq $s4,1,comeco
 	exitfunc:
 .end_macro
-.macro decisión_huir #s1 x ghost s2 y ghost devuelve el comando s3 s6 valor del vector donde se almacena el comando anterior
-#Sistema: primero elige si te mueves en x o y 50/50, luego si huyes de Pac-Man 4/5 o vas en la derección 1/5
-#Solo toma una decisión para una bifurcación
+.macro decision_huir #s1 x ghost s2 y ghost devuelve el comando s3 s6 valor del vector donde se almacena el comando anterior
+#Sistema: primero elige si te mueves en x o y 50/50, luego si huyes de Pac-Man 4/5 o vas en la derecciï¿½n 1/5
+#Solo toma una decisiï¿½n para una bifurcaciï¿½n
 	bifurcacion()
 	beqz $s4,anterior
 	#Cargar PacMan
@@ -98,7 +98,7 @@
 	lw $t2,4($t0)
 	##
 	comeco:
-	#genera un número aleatorio
+	#genera un nï¿½mero aleatorio
 	li $v0,42
 	li $a1,2
 	syscall
@@ -161,16 +161,16 @@
 	j exitfunc
 	########
 	exit:
-	#Si $s3 no es válido, busque otro.
+	#Si $s3 no es vï¿½lido, busque otro.
 	next_Block()
 	beq $s4,1,comeco
 	exitfunc:
 .end_macro
 .macro esquina #Comando s1 s2,s3 usado, devuelve en s3 un nuevo comando
-#Si hay una pared al frente y no es una bifurcación, esto último se garantiza en la función decisao_Ghost
+#Si hay una pared al frente y no es una bifurcaciï¿½n, esto ï¿½ltimo se garantiza en la funciï¿½n decisao_Ghost
 	next_Block()
 	beqz $s4,exit
-	#Si viene en y, retorna en x válido
+	#Si viene en y, retorna en x vï¿½lido
 	beq $s3,115,MoveX
 	beq $s3,119,MoveX
 	
