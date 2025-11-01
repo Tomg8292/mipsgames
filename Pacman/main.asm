@@ -6,7 +6,6 @@
 .include "desicion_Ghost.asm"
 .include "comer.asm"
 .include "punto.asm"
-.include "control_puntos.asm"
 
 .data	
 	#Address IO - CORREGIDO
