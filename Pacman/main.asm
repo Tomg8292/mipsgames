@@ -7,9 +7,11 @@
 .include "comer.asm"
 .include "punto.asm"
 .include "control_puntos.asm"
+
 .data	
-	#Address IO
-	KeyboardAddress: .word 0xFFFF0004
+	#Address IO - CORREGIDO
+	KeyboardControl: .word 0xFFFF0000
+	KeyboardData: .word 0xFFFF0004
 	
 	#Vector de posición de personaje
 	Posicao: .space 80# 5 caracteres 2 valores, x e y. 40-60 bytes son para conocer el último comando, 60-80 para encender pacman y los fantasmas del tiempo muerto
@@ -23,6 +25,7 @@
  	green:.word 0x00FF00
  	blue: .word 0x0000FF
  	blue_ghost: .word 0x80CEE1
+
 .text
 ###############inicio juego
 Seta:
@@ -113,19 +116,29 @@ addi $s2, $zero, 76
 lw $s0, white
 draw_Ghost()
 
-#zera keyboard
-lw $t0,KeyboardAddress
-addi $s3,$zero,0
-sw $s3,($t0)
+#zera keyboard - CORREGIDO: limpiar ambos registros
+lui $t0, 0xFFFF
+sw $zero, 0($t0)  # Limpiar control
+sw $zero, 4($t0)  # Limpiar data
 
 addi $t0, $zero, 45
 sw $t0, 60($s7)
 
 
-#Espera para empezar
+#Espera para empezar - CORREGIDO CON DELAY
 Espera:
-	lw $t0,KeyboardAddress
-	lw $s3,($t0)
+	# Agregar delay para no saturar el procesador
+	li $v0, 32
+	li $a0, 50      # 50ms de delay
+	syscall
+	
+	# Leer del teclado correctamente
+	lui $t0, 0xFFFF
+	lw $t1, 0($t0)      # Leer receiver control
+	andi $t1, $t1, 1    # Chequear bit ready
+	beqz $t1, Espera    # Si no hay tecla, seguir esperando
+	
+	lw $s3, 4($t0)      # Leer tecla
 	beq $s3,97,Pac_Man
 	beq $s3,100,Pac_Man
 	beq $s3,115,Pac_Man
@@ -133,11 +146,24 @@ Espera:
 	j Espera
 	
 Pac_Man:
-	
 	tiempo_de_powerup()
-	lw $t0,KeyboardAddress
-	lw $s3,($t0)
-	beq $s3,112,Espera
+	
+	# Leer teclado correctamente - CORREGIDO
+	lui $t0, 0xFFFF
+	lw $t1, 0($t0)      # Leer receiver control
+	andi $t1, $t1, 1    # Chequear bit ready
+	beqz $t1, no_key    # Si no hay tecla, usar el comando anterior
+	
+	lw $s3, 4($t0)      # Leer tecla
+	beq $s3,112,Espera  # Pausa
+	j process_movement
+	
+no_key:
+	# No hay tecla nueva, cargar el último comando
+	la $s7,Posicao
+	lw $s3,40($s7)      # Cargar último comando
+	
+process_movement:
 	la $s7,Posicao
 	lw $s1,($s7) #carga x
 	lw $s2,4($s7)#carga y
@@ -148,8 +174,8 @@ Pac_Man:
 	sw $s2,4($s7)
 	comer()
 	victoria()
-Fantasma_1:
 
+Fantasma_1:
 	la $s7,Posicao
 	lw $s1,8($s7)#carga x
 	lw $s2,12($s7)#carga y;
@@ -164,8 +190,8 @@ Fantasma_1:
 	sw $s1,8($s7)
 	sw $s2,12($s7)
 	comer()
-Fantasma_2:
 
+Fantasma_2:
 	la $s7,Posicao
 	lw $s1,16($s7)#carga x
 	lw $s2,20($s7)#carga y
@@ -179,8 +205,8 @@ Fantasma_2:
 	sw $s1,16($s7)
 	sw $s2,20($s7)
 	comer()
-Fantasma_3:
 
+Fantasma_3:
 	la $s7,Posicao
 	lw $s1,24($s7)#carga x
 	lw $s2,28($s7)#carga y
@@ -194,8 +220,8 @@ Fantasma_3:
 	sw $s1,24($s7)
 	sw $s2,28($s7)
 	comer()
-Fantasma_4:
 
+Fantasma_4:
 	la $s7,Posicao
 	lw $s1,32($s7)#carga x
 	lw $s2,36($s7)#carga y
@@ -209,9 +235,11 @@ Fantasma_4:
 	sw $s1,32($s7)
 	sw $s2,36($s7)
 	comer()
+
 fimmov:
-li $v0,32
-li $a0,75
-syscall
-j Pac_Man
+	# DELAY OBLIGATORIO - CORREGIDO: Ahora siempre se ejecuta
+	li $v0,32
+	li $a0,75
+	syscall
 	
+	j Pac_Man
