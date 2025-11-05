@@ -1,0 +1,422 @@
+\documentclass[a4paper,12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{geometry}
+\geometry{margin=2.5cm}
+\usepackage{setspace}
+\usepackage{hyperref}
+\usepackage{titlesec}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{booktabs}
+
+\titleformat{\section}{\Large\bfseries}{\thesection.}{1em}{}
+\titleformat{\subsection}{\large\bfseries}{\thesubsection.}{0.8em}{}
+
+% Configuración para bloques de código
+\lstset{
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    frame=single,
+    backgroundcolor=\color{gray!10}
+}
+
+\begin{document}
+
+\begin{center}
+    {\huge \textbf{Documentación Técnica - Mario Assembler}} \\[10pt]
+    {\Large Desarrollo y Explicación de las Consignas} \\[8pt]
+    {\normalsize \textbf{Autores:} Matías Berardo, Alexis Byrne, Agustina Caffaratti, Lucas Ruberto, Franco Rubin} \\[6pt]
+    {\normalsize \textbf{Fecha:} Noviembre 2025} \\[10pt]
+\end{center}
+
+\begin{abstract}
+Este documento presenta una descripción completa y detallada del desarrollo de cada una de las consignas del proyecto asignado. Su objetivo principal es servir como guía técnica que permita comprender el razonamiento, las decisiones de diseño, la implementación y las pruebas asociadas a cada punto solicitado en el trabajo.  
+La documentación está pensada tanto para el docente evaluador como para cualquier desarrollador o lector técnico que desee entender en profundidad cómo se resolvieron las distintas partes del sistema. A lo largo del documento se explica el propósito de cada módulo, la lógica aplicada, los algoritmos utilizados y los desafíos encontrados durante el proceso de desarrollo.
+\end{abstract}
+
+\section{Introducción}
+El presente informe tiene como propósito documentar de manera clara y organizada todas las etapas y consignas correspondientes al proyecto. En él se detalla tanto el análisis teórico como la implementación práctica de las soluciones propuestas, manteniendo un enfoque orientado a la comprensión técnica del código y la justificación de las decisiones tomadas.
+
+El documento se estructura de forma que cada consigna o apartado planteado en el enunciado sea explicado en profundidad. Se incluye información sobre la arquitectura general del sistema, los módulos desarrollados, las funciones principales, las estructuras de datos utilizadas y las rutinas clave.
+
+De esta manera, esta documentación busca no solo cumplir con los requerimientos formales del trabajo práctico, sino también dejar un registro técnico de calidad, útil para referencia y mantenimiento del proyecto a futuro.  
+
+La estructura del documento sigue el siguiente esquema general:
+\begin{itemize}
+    \item \textbf{Arquitectura del sistema:} descripción general del programa y su organización interna.
+    \item \textbf{Explicación de las consignas:} desarrollo detallado de cada punto del enunciado, con su respectiva implementación.
+    \item \textbf{Análisis de funcionamiento:} explicación del comportamiento esperado, casos de prueba y validaciones.
+\end{itemize}
+
+\section{Division de Tareas}
+En el grupo noa dividimos las tareas de la siguiente manera:
+\begin{itemize}
+    \item \textbf{Producer:} Matías Berardo
+    \item \textbf{Programación:}Franco Rubin, Alexis Byrne
+    \item \textbf{Arte y diseño:} Caffaratti Agustina, Lucas Ruberto
+
+\section{Objetivos del Documento}
+El objetivo de esta documentación es garantizar que cada aspecto del proyecto pueda ser comprendido sin necesidad de revisar el código fuente directamente. Se pretende que cualquier persona con conocimientos técnicos pueda seguir la lógica del desarrollo y entender cómo cada consigna fue resuelta, qué decisiones se tomaron, y por qué.
+
+\section{Estructura General del Proyecto}
+
+Antes de entrar en el detalle de las consignas, se presenta una visión general del sistema, sus módulos principales y la forma en que interactúan entre sí. Este contexto inicial permite entender mejor la relación entre los distintos componentes antes de abordar cada punto individual.
+
+El proyecto está organizado en módulos que dividen las tareas principales del juego, de manera que cada bloque del código cumple una función específica dentro del ciclo de ejecución. Esta separación favorece la comprensión, el mantenimiento y la posibilidad de realizar pruebas por partes.
+
+\subsection{Estructura Principal del Programa}
+
+En la raíz del programa se encuentra la rutina \texttt{main}, que cumple el rol de inicialización y control general. Desde allí se configuran las variables del entorno, se establecen las direcciones base de los periféricos simulados (el \textit{Bitmap Display} y el \textit{Keyboard MMIO}) y se da inicio al bucle principal del juego.  
+Este bucle coordina la lectura de entradas, la actualización física, la detección de colisiones y el renderizado en pantalla, garantizando el funcionamiento continuo del sistema.
+
+\subsection{Motor de Física}
+
+El motor de física, implementado en la rutina \texttt{update\_mario\_physics}, es responsable de simular el movimiento y las fuerzas que actúan sobre el personaje principal.  
+Su función incluye la aplicación de la gravedad, el control de la fricción y la actualización de las posiciones de Mario según sus velocidades en los ejes \texttt{x} e \texttt{y}.  
+Estos cálculos se realizan en cada iteración del bucle principal, manteniendo un comportamiento coherente y fluido.
+
+\subsection{Sistema de Entrada}
+
+El sistema de entrada está representado por la rutina \texttt{process\_input}, que interpreta las teclas presionadas mediante el uso de memoria mapeada en \texttt{0xFFFF0000}.  
+Esta lectura directa desde el registro MMIO permite que las acciones del jugador (moverse, saltar o salir del juego) se reflejen en tiempo real, modificando los valores de movimiento del personaje en los registros correspondientes.
+
+\subsection{Sistema de Renderizado}
+
+La parte gráfica del proyecto está controlada por el módulo de renderizado, implementado principalmente en la rutina \texttt{render\_frame}.  
+Este módulo escribe directamente en el framebuffer ubicado en memoria, en la dirección \texttt{0x10080000}. Allí, cada píxel es dibujado mediante rutinas auxiliares como \texttt{draw\_pixel} y \texttt{fill\_rect}, que se encargan de representar todos los elementos visibles del juego: plataformas, enemigos, objetos decorativos y al propio Mario.
+
+\subsection{Sistema de Colisiones}
+
+El sistema de colisiones se basa en comparaciones rectangulares del tipo AABB (\textit{Axis-Aligned Bounding Box}).  
+Este mecanismo permite verificar superposiciones entre Mario y los distintos objetos del entorno, como tubos, plataformas o enemigos.  
+Según el tipo de colisión detectada, el programa determina si debe detener la caída del personaje, permitir un salto o eliminar un enemigo cuando Mario lo pisa desde arriba.
+
+\subsection{Gestión de Entidades y Estados}
+
+Además de Mario, el juego cuenta con otras entidades como los \textit{Goombas} (enemigos), monedas y objetos del entorno.  
+Cada una tiene su propio comportamiento definido en rutinas específicas, que controlan su movimiento y estado.  
+Estas entidades se reinician con la rutina \texttt{init\_game\_state}, la cual restablece las posiciones iniciales, banderas de activación y variables de progreso del jugador.  
+La cámara también se gestiona en esta rutina, asegurando que el desplazamiento del escenario acompañe el movimiento de Mario.
+
+\subsection{Resumen de la Arquitectura}
+
+En conjunto, el sistema mantiene una arquitectura simple pero eficaz, donde cada módulo depende de datos globales bien definidos en el segmento \texttt{.data}.  
+Esto permite mantener sincronía entre la lógica del juego, las físicas, las entradas y el renderizado, garantizando un flujo estable y coherente durante toda la ejecución.  
+La estructura modular facilita además la depuración y ampliación del código, permitiendo añadir nuevas mecánicas o mejorar el rendimiento sin comprometer la organización general del proyecto.
+
+\section{Consignas Principales}
+
+\subsection{Sistema de Física y Movimiento}
+
+\subsubsection{Implementación del Motor Físico}
+
+El motor de física implementa un sistema de simulación basado en integración de Euler, donde la velocidad y posición se actualizan en cada frame. Las constantes físicas definidas en \texttt{.data} (\texttt{GRAVITY=1}, \texttt{JUMP\_VELOCITY=-12}, \texttt{MAX\_FALL\_SPEED=6}) controlan el comportamiento:
+
+\begin{lstlisting}[language={[mips]Assembler}]
+update_mario_physics:
+    lw $t0, mario_vy
+    lw $t1, GRAVITY
+    add $t0, $t0, $t1      # vy += gravity
+    # Limitar velocidad de caida
+    lw $t1, MAX_FALL_SPEED
+    blt $t0, $t1, vy_ok
+    move $t0, $t1
+\end{lstlisting}
+
+\subsubsection{Sistema de Aceleración Diferenciada}
+
+El código implementa dos modos de aceleración según el estado del personaje:
+
+\begin{itemize}
+    \item \textbf{En suelo:} \texttt{MAX\_SPEED=5}, \texttt{ACCELERATION=3} (control preciso)
+    \item \textbf{En aire:} \texttt{AIR\_MAX\_SPEED=8}, \texttt{AIR\_ACCELERATION=5} (mayor libertad de movimiento)
+\end{itemize}
+
+Esto permite mantener el control durante saltos mientras se limita el deslizamiento en tierra.
+
+\subsection{Detección de Colisiones AABB}
+
+\subsubsection{Sistema de Colisión Rectangular}
+
+Todas las colisiones usan el algoritmo AABB (\textit{Axis-Aligned Bounding Box}), verificando superposición en ambos ejes:
+
+\begin{lstlisting}[language={[mips]Assembler}]
+# Verificacion X: mario_right > obj_left AND mario_left < obj_right
+# Verificacion Y: mario_bottom > obj_top AND mario_top < obj_bottom
+\end{lstlisting}
+
+\subsubsection{Resolución de Colisiones por Prioridad}
+
+El sistema resuelve colisiones en orden específico:
+
+\begin{enumerate}
+    \item \textbf{Plataformas verticales:} Se verifica la posición previa (\texttt{prev\_mario\_y}) para determinar si Mario venía desde arriba. Solo permite aterrizaje si \texttt{mario\_bottom < platform\_top} en el frame anterior.
+
+    \item \textbf{Colisiones laterales:} Cuando hay overlap vertical, se calcula la distancia de penetración desde cada lado y se empuja al personaje por el lado con menor overlap:
+
+\begin{lstlisting}[language={[mips]Assembler}]
+sub $t3, $t2, $s1    # overlap_left = mario_right - platform_left
+sub $t5, $t4, $t0    # overlap_right = platform_right - mario_x
+blt $t3, $t5, push_mario_left
+\end{lstlisting}
+
+    \item \textbf{Tubos (pipes):} Similar a plataformas pero con detección especial para aterrizaje desde arriba (distancia máxima de 8 píxeles).
+\end{enumerate}
+
+\subsection{Sistema de Cámara y Scroll}
+
+\subsubsection{Scroll Horizontal con Dead Zone}
+
+La cámara mantiene a Mario centrado con una zona muerta de 80 píxeles desde el borde izquierdo:
+
+\begin{lstlisting}[language={[mips]Assembler}]
+sub $t2, $t0, $t1       # distancia = mario_x - camera_x
+li $t3, 80              # dead zone
+ble $t2, $t3, camera_bounds_check
+sub $t1, $t0, $t3       # camera_x = mario_x - 80
+\end{lstlisting}
+
+El sistema limita la cámara entre 0 y \texttt{WORLD\_WIDTH-128}, evitando mostrar áreas fuera del nivel.
+
+\subsection{Sistema de Animación}
+
+\subsubsection{Animación de Sprites Multi-Frame}
+
+Mario cuenta con 4 sprites diferentes:
+\begin{itemize}
+    \item Frame 1, 2, 3: Caminando (ciclo cada 5 frames)
+    \item Frame jump: En el aire
+\end{itemize}
+
+El sistema detecta automáticamente la dirección mediante \texttt{mario\_facing\_right} y espeja horizontalmente los sprites cuando es necesario:
+
+\begin{lstlisting}[language={[mips]Assembler}]
+mario_flip_pixel:
+    li $t5, 11
+    sub $t6, $t5, $s4      # columna_invertida = 11 - columna_actual
+\end{lstlisting}
+
+Los Goombas también tienen 2 frames que alternan según \texttt{goomba\_move\_counter}.
+
+\subsection{Sistema de Enemigos con IA}
+
+\subsubsection{Patrullaje con Límites Dinámicos}
+
+Cada Goomba tiene definidos límites min/max en la estructura de datos (20 bytes por entidad). El movimiento incluye:
+
+\begin{enumerate}
+    \item \textbf{Detección de bordes:} Invierte dirección al alcanzar límites
+    \item \textbf{Detección de tubos:} Usa \texttt{goomba\_pipe\_collision} para evitar atravesar obstáculos
+    \item \textbf{Movimiento por frames:} Solo se mueve cada 2 frames (\texttt{goomba\_move\_delay=2})
+\end{enumerate}
+
+\subsubsection{Colisión Mario-Goomba con Zona de Muerte}
+
+El sistema diferencia entre pisar y ser golpeado:
+
+\begin{lstlisting}[language={[mips]Assembler}]
+# Calcular centros verticales
+add $t0, mario_y, mario_height/2
+add $t2, goomba_y, goomba_height/2
+
+# Si centro de Mario esta arriba Y esta cayendo
+bge $t0, $t2, mario_dies_goomba
+bgtz mario_vy, kill_goomba_stomp
+\end{lstlisting}
+
+Solo mata al enemigo si Mario cae desde arriba Y la distancia es < 6 píxeles.
+
+\subsection{Sistema de Mystery Blocks y Power-ups}
+
+\subsubsection{Bloques con Estado Persistente}
+
+Cada bloque tiene estructura: \texttt{(x, y, hit\_flag, item\_type)}. Al golpear desde abajo:
+
+\begin{lstlisting}[language={[mips]Assembler}]
+# Verificar golpe: mario_top debe estar MUY cerca de block_bottom
+sub $t6, mario_top, block_bottom
+bgtz $t6, next_mystery      # No hay contacto
+li $t7, -10                 # Tolerancia de 10 pixeles
+blt $t6, $t7, next_mystery  # Muy lejos
+\end{lstlisting}
+
+\subsubsection{Sistema de Power-ups con Física}
+
+Los power-ups spawneados tienen física independiente:
+\begin{itemize}
+    \item Gravedad: \texttt{POWERUP\_GRAVITY=1}
+    \item Rebote inicial: \texttt{POWERUP\_BOUNCE=-6}
+    \item Colisión con suelo para detener caída
+\end{itemize}
+
+Tipos disponibles:
+\begin{itemize}
+    \item Estrella (\texttt{type=0}): +5000 puntos
+    \item Corazón (\texttt{type=1}): +1 vida (máximo 3)
+\end{itemize}
+
+\subsection{Optimizaciones de Renderizado}
+
+\subsubsection{Culling de Entidades}
+
+Todas las funciones de dibujo verifican visibilidad antes de renderizar:
+
+\begin{lstlisting}[language={[mips]Assembler}]
+li $t2, -20             # Margen izquierdo extendido
+blt screen_x, $t2, skip_entity
+li $t2, 140             # Margen derecho
+bge screen_x, $t2, skip_entity
+\end{lstlisting}
+
+\subsubsection{Sprites con Transparencia}
+
+Los sprites usan color \texttt{0x00000000} como transparente, saltando píxeles durante el renderizado:
+
+\begin{lstlisting}[language={[mips]Assembler}]
+lw $t0, 0($s2)          # Cargar color del sprite
+beqz $t0, skip_pixel    # Si es 0, no dibujar
+\end{lstlisting}
+
+\section{Análisis del Funcionamiento}
+
+\subsection{Flujo del Bucle Principal}
+
+\subsubsection{Ciclo de Ejecución}
+
+El juego ejecuta 60 iteraciones por segundo (delay de 1ms por frame), siguiendo esta secuencia:
+
+\begin{enumerate}
+    \item \texttt{process\_input}: Lee teclado MMIO (\texttt{0xFFFF0000})
+    \item \texttt{update\_mario\_physics}: Aplica física y actualiza posición
+    \item \texttt{check\_mystery\_block\_hits}: Detecta golpes a bloques
+    \item \texttt{update\_powerups}: Física de ítems
+    \item \texttt{check\_powerup\_collection}: Recolecta power-ups
+    \item \texttt{update\_camera}: Ajusta scroll
+    \item \texttt{update\_goombas}: IA y movimiento de enemigos
+    \item \texttt{check\_goomba\_collisions}: Combate con enemigos
+    \item \texttt{check\_coin\_collisions}: Recolección de monedas
+    \item \texttt{check\_pit\_death}: Caída al vacío
+    \item \texttt{render\_frame}: Dibuja todo en pantalla
+\end{enumerate}
+
+\subsection{Casos de Prueba Críticos}
+
+\subsubsection{Prueba 1: Salto Preciso entre Plataformas}
+
+\textbf{Escenario:} Mario en \texttt{x=190}, debe saltar a plataforma en \texttt{x=220, y=20}
+
+\textbf{Validación:}
+\begin{itemize}
+    \item Velocidad horizontal en aire permite alcanzar distancia (\texttt{AIR\_MAX\_SPEED=8})
+    \item \texttt{JUMP\_VELOCITY=-12} da altura suficiente
+    \item Detección de aterrizaje verifica \texttt{prev\_mario\_y} para evitar atravesar desde abajo
+\end{itemize}
+
+\textbf{Resultado esperado:} Aterrizaje suave sin rebotes
+
+\subsubsection{Prueba 2: Colisión con Tubería}
+
+\textbf{Escenario:} Mario corriendo hacia pipe en \texttt{x=350} (altura 24 píxeles)
+
+\textbf{Validación:}
+\begin{itemize}
+    \item Si \texttt{mario\_bottom} está dentro de 8 píxeles del tope de la pipe: permite aterrizaje
+    \item Si no: resuelve colisión lateral empujando a Mario hacia atrás
+    \item Función \texttt{check\_pipe\_landing} diferencia ambos casos
+\end{itemize}
+
+\textbf{Resultado esperado:} Aterrizaje en tubos bajos, bloqueo en tubos altos
+
+\subsubsection{Prueba 3: Eliminar Goomba con Salto}
+
+\textbf{Escenario:} Mario salta sobre Goomba en \texttt{x=60, y=ground-8}
+
+\textbf{Validación:}
+\begin{lstlisting}
+mario_center_y = 50 + 6 = 56
+goomba_center_y = 56 + 4 = 60
+56 < 60 → Mario esta arriba ✓
+mario_vy = 3 → Esta cayendo ✓
+distancia = mario_bottom - goomba_top = 64 - 56 = 8
+8 > 6 → NO elimina (demasiado lejos) ✗
+\end{lstlisting}
+
+\textbf{Ajuste necesario:} Mario debe estar más cerca (< 6 píxeles) del tope del Goomba
+
+\subsubsection{Prueba 4: Mystery Block Golpeado Múltiples Veces}
+
+\textbf{Escenario:} Mario salta bajo bloque en \texttt{x=52, y=8}
+
+\textbf{Validación:}
+\begin{itemize}
+    \item Primer golpe: \texttt{hit\_flag=0} → Spawnea power-up, cambia a sprite ``used''
+    \item Segundo golpe: \texttt{hit\_flag=1} → Ignora colisión (\texttt{bnez \$t1, next\_mystery})
+\end{itemize}
+
+\textbf{Resultado esperado:} Solo un power-up por bloque
+
+\subsubsection{Prueba 5: Caída al Vacío entre Islas}
+
+\textbf{Escenario:} Mario en \texttt{x=170} (gap entre isla 1 y 2)
+
+\textbf{Validación:}
+\begin{lstlisting}[language={[mips]Assembler}]
+lw $t0, mario_y         # y = 65 (debajo de pantalla)
+li $t1, 64
+blt $t0, $t1, pit_check_done
+jal mario_hit           # Pierde vida y resetea
+\end{lstlisting}
+
+\textbf{Resultado esperado:} Mario pierde vida y reaparece en \texttt{x=10, y=50}
+
+\subsection{Limitaciones Conocidas}
+
+\subsubsection{Problema 1: Atravesar Plataformas a Alta Velocidad}
+
+Si \texttt{mario\_vy > 10}, puede atravesar plataformas de 8 píxeles de altura en un solo frame. 
+
+\textbf{Solución:} \texttt{MAX\_FALL\_SPEED=6} limita esto.
+
+\subsubsection{Problema 2: Colisión Lateral con Esquinas}
+
+Al caer cerca del borde de una plataforma, ocasionalmente se resuelve como colisión lateral en lugar de aterrizaje. 
+
+\textbf{Mitigación:} Priorización de colisiones verticales.
+
+\subsubsection{Problema 3: Goomba Atascado en Tubería}
+
+Si los límites de patrulla del Goomba coinciden exactamente con un pipe, puede quedar oscilando. 
+
+\textbf{Solución:} Función \texttt{goomba\_pipe\_collision} que detecta y revierte movimiento.
+
+\subsection{Validación de Integridad del Sistema}
+
+\subsubsection{Sincronización Física-Render}
+
+El sistema garantiza coherencia mediante ejecución secuencial estricta:
+\begin{itemize}
+    \item Física se calcula ANTES de colisiones
+    \item Colisiones se resuelven ANTES de cámara
+    \item Cámara se actualiza ANTES de render
+\end{itemize}
+
+\subsubsection{Gestión de Memoria sin Fugas}
+
+Todas las entidades usan memoria estática en \texttt{.data}. No hay asignación dinámica, eliminando riesgo de memory leaks.
+
+\subsubsection{Recuperación de Errores}
+
+El sistema implementa reseteo completo con \texttt{reset\_game}:
+\begin{itemize}
+    \item Restaura posiciones iniciales
+    \item Limpia flags de colección (monedas, bloques)
+    \item Reinicia estados de enemigos (\texttt{alive=1})
+    \item Resetea power-ups activos (\texttt{x=-1})
+\end{itemize}
+
+Esto garantiza que cada partida comience en estado limpio y predecible.
+
+\end{document}
