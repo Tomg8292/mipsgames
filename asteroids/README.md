@@ -4,12 +4,14 @@ Asteroids es un clásico videojuego de arcade lanzado originalmente por Atari en
 
 
 ## Características
-Mecánicas del Jugador: Desplazamiento de la nave alrededor del mapa con WASD. 
+Mecánicas del Jugador: Desplazamiento de la nave alrededor del mapa con W y rotación A y D. 
 
 ### Físicas y Colisiones
-Colisiones con asteroides y generacion de los mismos con un vector de movimiento. Se generan dos tipos de asteroides.
+Colisiones con asteroides y generacion de los mismos con un vector de movimiento. Se generan tres tipos de asteroides.
 Interfaz: Muestra vidas en la parte superior izquierda y al colisionar con un asteroide la mismas son reducidas.
 Condiciones de Victoria/Derrota: Sobrevive el mayor tiempo posible y si se queda sin vidas aperece una "calavera" en la pantalla.
+Función de disparo y división de asteroides.
+Pantalla de inicio y GAME OVER.
 
 
 ## Instalación y Ejecución
@@ -27,10 +29,12 @@ Ejecutar: Ensambla y ejecuta. Usar WASD para desplazarse.
 
 
 ## Controles
-W o w: Mover hacia arriba.
-A o a: Mover a la izquierda.
-D o d: Mover a la derecha.
-S o s: Mover hacia abajo.
+w: Mover adelante.
+a: Rotar hacia la izquierda.
+d: Rotar hacia la derecha.
+j: Disparar.
+Enter : continuar y jugar de nuevo al perder.
+
 
 ## Notas
 Diseñado para fines académicos, demostrando programación en MIPS y gráficos en tiempo real. Si la pantalla parpadea, verifica la configuración de Bitmap Display y la conexión del MMIO Simulator.
