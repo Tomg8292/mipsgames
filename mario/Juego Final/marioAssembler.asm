@@ -39,14 +39,18 @@ MARIO_HEIGHT: .word 12
     GROUND_Y: .word 56
     GROUND_HEIGHT: .word 8
    
+    # En la sección .data, AGREGAR estos valores:
+
     # Physics
     GRAVITY: .word 1
-    JUMP_VELOCITY: .word -9
-    BOUNCE_VELOCITY: .word -8
-    MAX_FALL_SPEED: .word 8
-    ACCELERATION: .word 3
-    MAX_SPEED: .word 5
-    FRICTION: .word 1
+    JUMP_VELOCITY: .word -12      
+    BOUNCE_VELOCITY: .word -10    
+    MAX_FALL_SPEED: .word 6       
+    ACCELERATION: .word 3         
+    AIR_ACCELERATION: .word 5
+    MAX_SPEED: .word 5           
+    AIR_MAX_SPEED: .word 8    
+    FRICTION: .word 1 
 
 platforms: .word
  
@@ -1046,28 +1050,60 @@ process_input:
 move_left:
     li $s0, 1
     lw $t0, mario_vx
+    
+    # ¿Está en el aire?
+    lw $t5, mario_on_ground
+    beqz $t5, move_left_air
+    
+    # --- EN EL SUELO ---
     lw $t1, ACCELERATION
     sub $t0, $t0, $t1
-   
     lw $t1, MAX_SPEED
     neg $t2, $t1
+    j move_left_check_clamp
+    
+move_left_air:
+    # --- EN EL AIRE ---
+    lw $t1, AIR_ACCELERATION
+    sub $t0, $t0, $t1
+    lw $t1, AIR_MAX_SPEED
+    neg $t2, $t1
+    
+move_left_check_clamp:
     blt $t0, $t2, clamp_left
     sw $t0, mario_vx
     j apply_friction
+    
 clamp_left:
     sw $t2, mario_vx
     j apply_friction
 
+
 move_right:
     li $s0, 1
     lw $t0, mario_vx
+    
+    # ¿Está en el aire?
+    lw $t5, mario_on_ground
+    beqz $t5, move_right_air
+    
+    # --- EN EL SUELO ---
     lw $t1, ACCELERATION
     add $t0, $t0, $t1
-   
     lw $t1, MAX_SPEED
+    j move_right_check_clamp
+    
+move_right_air:
+    # --- EN EL AIRE ---
+    lw $t1, AIR_ACCELERATION
+    add $t0, $t0, $t1
+    lw $t1, AIR_MAX_SPEED
+    
+move_right_check_clamp:
     bgt $t0, $t1, clamp_right
     sw $t0, mario_vx
     j apply_friction
+    
 clamp_right:
     sw $t1, mario_vx
     j apply_friction
