@@ -1,0 +1,3745 @@
+Documentación Completa: Juego 1942 en MIPS Assembly para MARS.
+ÍNDICE
+Sección de Datos (.data)
+Funciones de Scroll y Dibujado del Mar
+Sistema de Spawn (Balas, Enemigos, Power-ups, Explosiones)
+Sistemas de Actualización
+Funciones de Dibujado
+Funciones de Colisión y Utilidades
+Flujo de Ejecución del Código
+Tabla de Funciones
+
+
+1. SECCIÓN DE DATOS (.data)
+Esta sección define todas las "variables globales" del juego en memoria estática.
+Variables Principales de Configuración:
+
+SCREEN_WIDTH y SCREEN_HEIGHT: Tamaño de la pantalla (64x64 píxeles)
+player_x, player_y: Posición actual del avión del jugador
+player_x_old, player_y_old: Posición anterior para poder "borrar" el avión al moverse
+PLAYER_SIZE y PLAYER_HEIGHT: Dimensiones del sprite del avión (12x8 píxeles)
+MOVE_SPEED: Velocidad de movimiento del jugador (2 píxeles por frame)
+
+Sistema del Portaaviones Inicial:
+Implementa un sistema para que el portaaviones aparezca al inicio y se desplace hacia abajo.
+
+carrier_visible: Flag que indica si el portaaviones está en pantalla (1=visible, 0=oculto)
+carrier_y_offset: Posición vertical del portaaviones (inicia en 16)
+CARRIER_HEIGHT: Altura del sprite del portaaviones (48 píxeles)
+CARRIER_SCROLL_SPEED: Velocidad de desplazamiento vertical (1 píxel por frame)
+
+Sistema de Scroll del Mar:
+Crea el efecto de movimiento constante del agua.
+
+sea_scroll_offset: Controla qué fila del patrón de olas mostrar (0-15)
+sea_scroll_counter: Cuenta frames para ralentizar el scroll
+SEA_SCROLL_RATE: Cada cuántos frames se mueve el mar (3 frames)
+sea_scroll_speed: Velocidad del scroll (1 píxel)
+
+Sistema de Balas Enemigas:
+Arrays para manejar múltiples balas simultáneas:
+
+MAX_BULLETS: Máximo de 5 balas enemigas en pantalla
+bullet_0 a bullet_4: Cada bala almacena 5 words (20 bytes):
+
+Offset 0: active (1=activa, 0=inactiva)
+Offset 4: x (posición horizontal)
+Offset 8: y (posición vertical)
+Offset 12: old_x (posición anterior X para borrado)
+Offset 16: old_y (posición anterior Y para borrado)
+
+
+BULLET_SIZE: Tamaño del sprite de bala (3x3 píxeles)
+BULLET_SPEED: Velocidad de caída (2 píxeles por frame)
+BULLET_SPAWN_RATE: Frames entre spawns (40 frames ≈ 0.67 segundos a 60 FPS)
+
+Sistema de Balas del Jugador:
+
+MAX_PLAYER_BULLETS: Máximo 10 balas del jugador
+player_bullet_0 a player_bullet_9: Misma estructura que balas enemigas (5 words cada una)
+PLAYER_BULLET_WIDTH: Ancho de bala del jugador (1 píxel)
+PLAYER_BULLET_HEIGHT: Alto de bala del jugador (3 píxeles)
+PLAYER_BULLET_SPEED: Velocidad ascendente (2 píxeles por frame)
+player_can_shoot: Flag de capacidad de disparo (1=puede disparar)
+
+Sistema de Enemigos:
+
+MAX_ENEMIES: Máximo 3 enemigos simultáneos en pantalla
+enemy_0 a enemy_2: Cada enemigo almacena 9 words (36 bytes):
+
+Offset 0: active (1=activo, 0=inactivo)
+Offset 4: x
+Offset 8: y
+Offset 12: old_x
+Offset 16: old_y
+Offset 20: shoot_counter (control de disparos)
+Offset 24: move_counter (para ralentizar movimiento)
+Offset 28: type (0=gris[50pts], 1=verde[100pts], 2=amarillo[150pts])
+Offset 32: direction (-1=izquierda, 0=sin movimiento horizontal, 1=derecha)
+
+
+ENEMY_SIZE: Tamaño del sprite enemigo (9x9 píxeles)
+ENEMY_SPEED: Velocidad vertical (1 píxel)
+ENEMY_MOVE_RATE: Frames entre movimientos (3 frames)
+ENEMY_SPAWN_RATE: Frames entre spawns (50 frames ≈ 0.83 segundos)
+ENEMY_SHOOT_RATE: Frames entre disparos (30 frames)
+ENEMY_HORIZONTAL_SPEED: Velocidad de movimiento lateral (1 píxel)
+ENEMY_DIRECTION_CHANGE_RATE: Frames para cambio de dirección (10 frames)
+
+Sistema de Power-Up (POW):
+
+pow_active: Flag de power-up activo (1=en pantalla)
+pow_x, pow_y: Posición actual del power-up
+pow_old_x, pow_old_y: Posición anterior
+POW_SIZE: Tamaño del sprite (7x7 píxeles)
+POW_SPEED: Velocidad de caída (1 píxel)
+pow_move_counter: Contador para ralentizar caída
+POW_MOVE_RATE: Frames entre movimientos (5 frames - más lento que balas)
+pow_spawn_counter: Contador de enemigos destruidos para spawn
+POW_SPAWN_EVERY: Cada cuántos enemigos aparece POW (5 enemigos)
+
+Sistema de Disparo Doble:
+
+double_shot_active: Flag de power-up activo (1=activado)
+double_shot_ammo: Disparos restantes con doble bala (5 disparos)
+
+Sistema de Explosiones:
+
+MAX_EXPLOSIONS: Máximo 5 explosiones simultáneas
+explosion_0 a explosion_4: Cada explosión almacena 6 words (24 bytes):
+
+Offset 0: active
+Offset 4: x
+Offset 8: y
+Offset 12: frame (0-7, para animación de 8 frames)
+Offset 16: frame_counter (control de velocidad de animación)
+Offset 20: size (0=pequeña 9x9, 1=grande 27x27)
+
+
+EXPLOSION_FRAME_RATE: Frames entre cambio de sprite (3 frames)
+
+Sistema de Loop/Barrel Roll:
+
+loop_active: Flag de maniobra activa (1=ejecutando loop)
+loop_frame: Frame actual de animación (0-7)
+loop_frame_counter: Contador para velocidad de animación
+LOOP_FRAME_RATE: Frames entre sprites (2 frames)
+loop_cooldown: Frames restantes de cooldown
+LOOP_COOLDOWN_TIME: Tiempo de cooldown (600 frames = 10 segundos a 60 FPS)
+loop_invulnerable: Flag de invulnerabilidad durante loop (1=invulnerable)
+
+Sistema de Vidas y Puntuación:
+
+player_lives: Vidas del jugador (inicialmente 3)
+player_score: Puntuación actual del jugador
+POINTS_PER_KILL: Puntos por enemigo gris (50 puntos)
+game_over_flag: Flag de game over (1=juego terminado)
+game_won_flag: Flag de victoria (1=juego ganado)
+
+Sistema de Pantalla READY:
+
+show_ready_screen: Flag para mostrar pantalla inicial (1=mostrar)
+
+Sistema del Barco Final:
+
+final_ship_active: Flag del barco final (1=activo)
+final_ship_y_offset: Posición Y del barco final (inicia en -48, fuera de pantalla)
+final_ship_scroll_speed: Velocidad de aparición (1 píxel)
+game_timer: Contador de frames del juego
+FINAL_SHIP_TRIGGER: Frames para activar barco final (600 frames = 10 segundos)
+
+Sistema del Boss Final:
+
+boss_active: Flag del boss (1=activo)
+boss_x, boss_y: Posición del boss (inicia en x=18, y=-27)
+boss_old_x, boss_old_y: Posición anterior
+boss_health: Vida del boss (15 golpes)
+BOSS_MAX_HEALTH: Vida máxima (15)
+BOSS_SIZE: Tamaño del sprite (27x27 píxeles)
+BOSS_MOVE_SPEED: Velocidad de movimiento (1 píxel)
+boss_move_counter: Contador de movimiento
+BOSS_MOVE_RATE: Frames entre movimientos (5 frames)
+boss_direction: Dirección horizontal (1=derecha, -1=izquierda)
+BOSS_POINTS: Puntos por derrotar boss (1000 puntos)
+boss_shoot_counter: Contador de disparos
+BOSS_SHOOT_RATE: Frames entre disparos (60 frames)
+
+Paletas de Colores (formato hexadecimal 0x00RRGGBB):
+
+sea_colors: Dos tonos de azul para las olas del mar
+
+0x000066CC (azul oscuro)
+0x004499DD (azul claro)
+
+
+Colores del portaaviones:
+
+carrier_gray: 0x00627070 (gris medio)
+carrier_light_gray: 0x009D9D9D (gris claro)
+carrier_black: 0x00000000 (negro para detalles)
+
+
+Colores del avión del jugador:
+
+plane_white: 0x00FCFCFC (blanco para cuerpo)
+plane_gray: 0x00BCBCBC (gris para sombras)
+plane_salmon: 0x00FC7460 (salmón para detalles)
+
+
+Colores de balas enemigas:
+
+bullet_yellow: 0x00F0BC3C (amarillo para bordes)
+bullet_red: 0x00D82800 (rojo para centro)
+
+
+Colores de balas del jugador:
+
+player_bullet_yellow: 0x00F0BC3C (amarillo para punta)
+player_bullet_red: 0x00D82800 (rojo para cuerpo)
+
+
+Colores de enemigos tipo 1 (gris):
+
+enemy_gray_light: 0x00BCBCBC
+enemy_gray_dark: 0x00747474
+enemy_red: 0x00D82800 (cabina)
+
+
+Colores de enemigos tipo 2 (verde):
+
+enemy2_green_light: 0x0080CF10
+enemy2_green_dark: 0x00009300
+enemy2_red: 0x00D82800 (cabina)
+
+
+Colores de enemigos tipo 3 (amarillo):
+
+enemy3_yellow: 0x00F0BC3C
+enemy3_red: 0x00D82800
+enemy3_white: 0x00FCFCFC (cabina)
+
+
+Colores del power-up POW:
+
+pow_green_light: 0x0080D010
+pow_green_dark: 0x00009400
+
+
+Colores de explosión:
+
+explosion_white: 0x00FFFFFF (partículas)
+explosion_yellow: 0x00F0BC3C (núcleo)
+explosion_red: 0x00D82800 (fuego)
+
+
+Colores del boss:
+
+boss_green_light: 0x00AA00 (verde claro)
+boss_green_dark: 0x005000 (verde oscuro)
+boss_white: 0xFFFFFF (hélices)
+
+
+Colores del HUD:
+
+hud_white: 0x00FFFFFF (números)
+hud_red: 0x00FF0000 (corazones)
+hud_black: 0x00000000 (contorno)
+
+
+
+Sprites y Patrones:
+
+wave_pattern: Patrón de olas del mar (16x32 bytes), donde cada byte es 0 o 1
+carrier_sprite: Sprite del portaaviones (32x48 píxeles, valores 0-3)
+plane_sprite: Sprite del avión del jugador (12x8 píxeles, valores 0-3)
+loop_sprite_0 a loop_sprite_7: 8 frames de animación del barrel roll (12x8 cada uno)
+bullet_sprite: Sprite de bala enemiga (3x3 píxeles, valores 0-2)
+player_bullet_sprite: Sprite de bala del jugador (1x3 píxeles, valores 1-2)
+enemy_sprite: Sprite enemigo tipo 1 gris (9x9 píxeles, valores 0-3)
+enemy2_sprite: Sprite enemigo tipo 2 verde (9x9 píxeles, valores 0-3)
+enemy3_sprite: Sprite enemigo tipo 3 amarillo (9x9 píxeles, valores 0-3)
+pow_sprite: Sprite del power-up (7x7 píxeles, valores 0-2)
+explosion_small_0 a explosion_small_7: 8 frames de explosión pequeña (9x9 cada uno, valores 0-3)
+boss_sprite: Sprite del boss (27x27 píxeles, valores 0-3)
+digit_0 a digit_9: Sprites de números 0-9 (3x5 píxeles cada uno)
+heart_sprite: Sprite de corazón (5x5 píxeles)
+
+Tablas de Punteros:
+
+digit_table: Tabla con direcciones de los 10 sprites de dígitos
+explosion_small_table: Tabla con direcciones de los 8 frames de explosión
+loop_sprite_table: Tabla con direcciones de los 8 frames del loop
+
+
+2. FUNCIONES DE SCROLL Y DIBUJADO DEL MAR
+
+scroll_sea
+Controla el efecto visual de movimiento del mar y del portaaviones inicial.
+Funcionamiento detallado:
+scroll_sea:
+    # Incrementar contador cada frame
+lw $t0, sea_scroll_counter
+addi $t0, $t0, 1
+sw $t0, sea_scroll_counter
+Incrementa un contador en cada frame. No se mueve el mar cada frame porque sería demasiado rápido, este contador "ralentiza" el movimiento para crear un efecto más suave.
+# Solo scrollear cada 3 frames
+lw $t1, SEA_SCROLL_RATE # 3 frames
+blt $t0, $t1, scroll_done # Si no pasaron 3 frames, salir
+Verifica si ya pasaron 3 frames. Si no, salta al final sin hacer nada. Esto crea un scroll suave y controlado (aproximadamente 20 píxeles por segundo a 60 FPS).
+# Resetear contador e incrementar offset
+sw $zero, sea_scroll_counter
+lw $t0, sea_scroll_offset
+lw $t1, sea_scroll_speed
+add $t0, $t0, $t1
+Cuando toca scrollear, resetea el contador a 0 y aumenta el offset en 1. Este offset determina desde qué fila del patrón de olas comenzar a dibujar.
+# Si llegamos al final del patrón (16), volver al inicio
+li $t2, 16
+blt $t0, $t2, scroll_save
+sub $t0, $t0, $t2 # offset = offset - 16
+El patrón de olas tiene 16 filas de altura. Cuando el offset llega a 16, se resetea a 0 mediante una resta. Esto crea un loop infinito seamless (sin costuras) del patrón.
+Lógica del portaaviones inicial:
+# Mover el portaaviones hacia abajo junto con el mar
+lw $t0, carrier_visible
+beqz $t0, scroll_redraw # Si no está visible, skip
+
+lw $t1, carrier_y_offset
+lw $t2, CARRIER_SCROLL_SPEED # 1 píxel
+add $t1, $t1, $t2
+sw $t1, carrier_y_offset
+Si el portaaviones está visible, también se mueve hacia abajo 1 píxel cada vez que el mar se scrollea. Esto simula que el jugador despega del portaaviones al inicio del juego.
+Finalmente llama a draw_sea_scrolling y draw_carrier para redibujar el mar y el portaaviones con las nuevas posiciones.
+
+draw_sea_scrolling
+Dibuja toda la pantalla del mar aplicando el offset de scroll para crear el efecto de movimiento.
+Concepto clave: En vez de mover datos en memoria o recalcular el patrón, simplemente cambiamos desde dónde empezamos a leer el patrón existente. Es una técnica clásica de juegos retro llamada "scrolling by offset".
+draw_sea_scrolling:
+move $t0, $gp # $gp apunta al inicio del display
+la $t9, wave_pattern # Puntero al patrón de olas
+la $s7, sea_colors # Puntero a los dos colores del mar
+lw $s6, sea_scroll_offset # Offset actual (0-15)
+
+Inicializa los registros:
+
+$gp (global pointer): En MARS Bitmap Display apunta al inicio de la memoria de video (dirección base del framebuffer)
+$t9: Apunta al patrón de olas (16x32 bytes)
+$s7: Apunta al array de colores
+$s6: Contiene el offset de scroll actual
+
+sea_scroll_y_loop:
+    # Para cada fila Y de la pantalla (0-63)
+add $t7, $t1, $s6 # Y_pantalla + offset
+andi $t2, $t7, 0xF # Módulo 16 (wrap del patrón)
+sll $t2, $t2, 5 # * 32 (ancho del patrón en bytes)
+add $t3, $t9, $t2 # Puntero a la fila del patrón
+Para cada fila de la pantalla (64 filas totales):
+
+Suma la Y de pantalla con el offset de scroll
+Hace módulo 16 con andi $t2, $t7, 0xF (equivalente a t2 = t7 % 16)
+Multiplica por 32 para obtener el offset de byte en el patrón (cada fila tiene 32 bytes)
+Calcula la dirección de memoria de esa fila en el patrón
+
+Ejemplo: Si sea_scroll_offset = 5 y estamos en Y = 0:
+
+t7 = 0 + 5 = 5
+t2 = 5 & 0xF = 5
+t2 = 5 * 32 = 160 (offset de byte)
+Se dibujará la fila 5 del patrón en la fila 0 de la pantalla
+
+sea_scroll_x_loop:
+    # Para cada columna X (0-63)
+andi $t5, $t4, 0x1F # Módulo 32 (wrap horizontal)
+add $t6, $t3, $t5 # Dirección del byte en el patrón
+lb $t6, 0($t6) # Cargar el byte (0 o 1)
+
+Para cada píxel en X, carga el byte del patrón (0 = azul oscuro, 1 = azul claro)
+
+# Convertir 0/1 a color RGB real
+sll $t7, $t6, 2 # * 4 (tamaño de word en bytes)
+add $t7, $s7, $t7 # Offset en sea_colors array
+lw $t7, 0($t7) # Cargar color RGB (0x00RRGGBB)
+
+sw $t7, 0($t0) # Escribir al display
+addi $t0, $t0, 4 # Siguiente píxel (words de 4 bytes)
+Usa el valor 0 o 1 como índice en el array sea_colors:
+
+Si es 0: obtiene sea_colors[0] = 0x000066CC (azul oscuro)
+Si es 1: obtiene sea_colors[1] = 0x004499DD (azul claro)
+
+Escribe el color RGB de 32 bits al framebuffer y avanza al siguiente píxel.
+Este método es muy eficiente porque:
+No recalcula el patrón
+No mueve datos en memoria
+Solo cambia el punto de inicio de lectura
+El patrón se puede reutilizar infinitamente mediante wrap (módulo)
+
+
+draw_sea_full
+Dibuja el mar completo sin aplicar offset de scroll. Se usa al inicio del juego o cuando se necesita redibujar todo desde cero.
+Es similar a draw_sea_scrolling pero sin aplicar el offset, simplemente dibuja el patrón desde su posición original (fila 0).
+
+get_background_color
+Función auxiliar crítica que determina qué color debe tener un píxel específico en las coordenadas (x, y).
+Parámetros:
+
+$a0: coordenada X
+$a1: coordenada Y
+
+Retorna:
+
+$v0: color RGB del fondo en esa posición
+
+Funcionamiento:
+
+Verifica si hay un barco final o portaaviones inicial visible
+Si el píxel está dentro del área de algún barco, obtiene el color del sprite del barco
+Si el píxel del sprite del barco es 0 (transparente), continúa con el mar
+Si no hay barcos o el píxel no está sobre ninguno, obtiene el color del patrón del mar
+
+Esta función es esencial para el borrado correcto de objetos, ya que permite restaurar el fondo exacto (ya sea mar o parte de un barco) donde estaba un objeto que se movió.
+
+3. SISTEMA DE SPAWN (BALAS, ENEMIGOS, POWER-UPS, EXPLOSIONES)
+spawn_bullet
+Crea nuevas balas enemigas que caen desde la parte superior de la pantalla. Implementa control de frecuencia para evitar spam.
+Funcionamiento:
+spawn_bullet:
+    # Sistema de rate limiting
+lw $t0, bullet_spawn_counter
+addi $t0, $t0, 1
+sw $t0, bullet_spawn_counter
+
+lw $t1, BULLET_SPAWN_RATE # 40 frames
+blt $t0, $t1, spawn_done # Si no pasaron 40 frames, salir
+Implementa un contador que se incrementa cada frame. Solo genera una bala cada 40 frames (aproximadamente 0.67 segundos a 60 FPS). Esto mantiene el juego desafiante pero jugable.
+sw $zero, bullet_spawn_counter # Resetear contador
+
+    # Buscar slot libre en el array de balas
+la $t0, bullet_0
+lw $t1, 0($t0)
+beqz $t1, spawn_in_slot # Si active==0, está libre
+
+la $t0, bullet_1
+lw $t1, 0($t0)
+beqz $t1, spawn_in_slot
+    # ... continúa con bullet_2, bullet_3, bullet_4
+Busca una bala inactiva (active = 0) en el array de 5 balas. En assembly, desenrollar el loop manualmente a veces es más eficiente que usar un loop con contador.
+spawn_in_slot:
+li $t2, 1
+sw $t2, 0($t0) # active = 1
+
+    # Generar posición X aleatoria usando tiempo del sistema
+li $v0, 30 # syscall 30 = get time
+syscall
+move $t3, $a0 # tiempo en milisegundos
+andi $t3, $t3, 0x3F # Módulo 64 (0-63) mediante AND
+Activa la bala. Para generar una posición X pseudo-aleatoria:
+
+Usa syscall 30 que retorna el tiempo del sistema en $a0
+Hace AND con 0x3F (bits 0-5) para obtener un número entre 0-63
+No es un RNG criptográfico, pero para un juego simple es suficiente y muy rápido
+
+# Validar que la bala quepa completamente en pantalla
+li $t4, 59 # 64 - 3 (tamaño bala) - 2 (margen)
+bgt $t3, $t4, spawn_adjust # Si X > 59, ajustar
+j spawn_set_pos
+
+spawn_adjust:
+li $t3, 59 # Posición segura
+Verifica que la bala (3x3 píxeles) no aparezca parcialmente fuera de pantalla. Si X > 59, la ajusta a 59 para que quepa completamente.
+spawn_set_pos:
+sw $t3, 4($t0) # x
+li $t4, 0
+sw $t4, 8($t0) # y = 0 (arriba de pantalla)
+sw $t3, 12($t0) # old_x = x (para primer frame)
+sw $t4, 16($t0) # old_y = 0 (para primer frame)
+Inicializa todas las propiedades de la bala:
+
+x: posición horizontal aleatoria calculada
+y: 0 (aparece en la parte superior)
+old_x, old_y: iguales a x e y para el primer frame (para el sistema de borrado)
+
+
+spawn_enemy
+Genera nuevos aviones enemigos desde la parte superior. Determina el tipo de enemigo, su posición y comportamiento inicial.
+spawn_enemy:
+    # Control de frecuencia
+lw $t0, enemy_spawn_counter
+addi $t0, $t0, 1
+sw $t0, enemy_spawn_counter
+
+lw $t1, ENEMY_SPAWN_RATE # 50 frames
+blt $t0, $t1, spawn_enemy_done
+
+sw $zero, enemy_spawn_counter
+Similar al sistema de balas, usa un contador para generar enemigos cada 50 frames (aproximadamente 0.83 segundos a 60 FPS).
+Sistema de tipos de enemigos con progresión:
+# Incrementar contador total de spawns
+lw $t7, enemy_spawn_count
+addi $t7, $t7, 1
+sw $t7, enemy_spawn_count
+
+li $s6, 0 # Por defecto tipo 0 (gris, 50 puntos)
+
+    # ¿Es múltiplo de 15? → Tipo 3 (amarillo, 150 puntos)
+li $t8, 15
+div $t7, $t8
+mfhi $t9 # mfhi = move from HI (resto de división)
+beqz $t9, spawn_type_3 # Si resto == 0, es múltiplo
+
+    # ¿Es múltiplo de 5? → Tipo 2 (verde, 100 puntos)
+li $t8, 5
+div $t7, $t8
+mfhi $t9
+beqz $t9, spawn_type_2
+
+    # Si no, es tipo 1 (gris, 50 puntos)
+Implementa un sistema de progresión de dificultad:
+
+Cada 15 enemigos: aparece uno amarillo (difícil, 150 puntos)
+Cada 5 enemigos (no múltiplo de 15): aparece uno verde (medio, 100 puntos)
+Resto: grises normales (50 puntos)
+
+Usa la instrucción div que pone el cociente en LO y el resto en HI. mfhi (move from HI) obtiene el resto para verificar si es múltiplo.
+spawn_find_slot:
+    # Buscar slot libre (máximo 3 enemigos simultáneos)
+la $t0, enemy_0
+lw $t1, 0($t0)
+beqz $t1, spawn_enemy_in_slot
+    # ... enemy_1, enemy_2
+Solo permite 3 enemigos en pantalla simultáneamente. Esto mantiene el balance: desafiante pero no imposible.
+Sistema integrado de power-ups:
+spawn_enemy_in_slot:
+    # Guardar puntero del enemigo en $s7 (saved register)
+move $s7, $t0
+
+    # Sistema de spawn de POW cada 5 enemigos
+lw $t8, pow_spawn_counter
+addi $t8, $t8, 1
+sw $t8, pow_spawn_counter
+
+lw $t9, POW_SPAWN_EVERY # 5 enemigos
+bne $t8, $t9, skip_pow_spawn
+
+    # Resetear contador y spawear POW
+sw $zero, pow_spawn_counter
+lw $a3, pow_active
+bnez $a3, skip_pow_spawn # No spawear si ya hay uno
+
+jal spawn_pow # Llamada a función
+skip_pow_spawn:
+    # Restaurar puntero del enemigo desde $s7
+move $t0, $s7
+Importante: Guarda el puntero del enemigo en $s7 (saved register) antes de llamar a spawn_pow porque esa función puede modificar registros temporales (t0−t0-
+t0−t9). Después lo restaura para continuar configurando el enemigo.
+
+Cada 5 enemigos normales, genera un power-up POW (estrella verde que otorga disparo doble por 5 disparos). Solo permite un POW en pantalla simultáneamente.
+# Activar enemigo
+li $t2, 1
+sw $t2, 0($t0) # active = 1
+
+    # Posición X aleatoria
+li $v0, 30
+syscall
+move $t3, $a0
+andi $t3, $t3, 0x3F # 0-63
+
+li $t4, 55 # 64 - 9 (tamaño enemigo) = 55
+bgt $t3, $t4, spawn_center_enemy
+j spawn_set_enemy_pos
+
+spawn_center_enemy:
+li $t3, 27 # Centrar (64/2 - 9/2 ≈ 27)
+Genera posición X aleatoria similar a las balas, pero ajusta para el tamaño del enemigo (9x9). Si se sale, lo centra en X=27.
+spawn_set_enemy_pos:
+sw $t3, 4($t0) # x
+li $t4, 0
+sw $t4, 8($t0) # y = 0 (arriba)
+sw $t3, 12($t0) # old_x
+sw $t4, 16($t0) # old_y
+sw $zero, 20($t0) # shoot_counter = 0
+sw $zero, 24($t0) # move_counter = 0
+sw $s6, 28($t0) # type (0, 1, o 2)
+Inicializa todas las propiedades del enemigo. Notar que type se guarda en offset 28 con el valor calculado anteriormente ($s6).
+Dirección horizontal aleatoria:
+# Generar dirección aleatoria
+li $v0, 30
+syscall
+move $t5, $a0
+andi $t5, $t5, 0x3 # 0, 1, 2, o 3
+
+    # Mapear a direcciones:
+li $t6, 2
+beq $t5, $t6, set_direction_left # 2 → izquierda (-1)
+li $t6, 3
+beq $t5, $t6, set_direction_right # 3 → derecha (1)
+    # 0 o 1 → sin movimiento horizontal (0)
+sw $zero, 32($t0)
+j spawn_enemy_done
+
+set_direction_left:
+li $t6, -1
+sw $t6, 32($t0)
+j spawn_enemy_done
+
+set_direction_right:
+li $t6, 1
+sw $t6, 32($t0)
+Asigna comportamiento de movimiento horizontal aleatorio:
+
+50% probabilidad (0 o 1): solo baja verticalmente
+25% probabilidad (2): se mueve a la izquierda mientras baja
+25% probabilidad (3): se mueve a la derecha mientras baja
+
+Esto hace que los patrones de enemigos sean menos predecibles y más desafiantes.
+
+spawn_pow
+Crea el power-up POW (estrella verde) que otorga disparo doble.
+spawn_pow:
+    # Activar el power-up
+li $t0, 1
+sw $t0, pow_active
+Marca el POW como activo. Solo puede haber uno en pantalla (verificado antes de llamar a esta función).
+# Generar posición X aleatoria
+li $v0, 30
+syscall
+move $t1, $a0
+andi $t1, $t1, 0x3F # 0-63
+
+    # Ajustar para que quepa (POW es 7x7)
+li $t2, 57 # 64 - 7 = 57
+bgt $t1, $t2, pow_center
+j pow_set_pos
+
+pow_center:
+li $t1, 28 # Centrar (64/2 - 7/2 ≈ 28)
+Genera posición X aleatoria. Si no cabe completamente en pantalla (X > 57), lo centra.
+pow_set_pos:
+sw $t1, pow_x
+sw $t1, pow_old_x
+li $t3, 0
+sw $t3, pow_y # Y = 0 (arriba)
+sw $t3, pow_old_y
+sw $zero, pow_move_counter # Contador de movimiento
+
+Inicializa todas las variables del POW. El contador pow_move_counter se usa con POW_MOVE_RATE = 5, lo que significa que el POW se mueve solo cada 5 frames, haciéndolo caer mucho más lento que las balas (que se mueven cada frame o cada 2-3 frames).
+Diseño de gameplay: El movimiento lento del POW añade un elemento de riesgo-recompensa. El jugador debe decidir si:
+
+- Ignorarlo y seguir esquivando balas seguro
+- Arriesgarse a ir por él para obtener el poder del disparo doble
+
+spawn_explosion
+Crea una animación de explosión cuando un enemigo es destruido o el jugador es impactado.
+Parámetros:
+
+$a0: coordenada X de la explosión
+$a1: coordenada Y de la explosión
+$a2: tamaño (0 = pequeña 9x9, 1 = grande 27x27)
+
+spawn_explosion:
+    # Buscar slot libre en el array de explosiones
+la $t0, explosion_0
+lw $t1, 0($t0)
+beqz $t1, spawn_explosion_in_slot
+    # ... explosion_1, explosion_2, explosion_3, explosion_4
+Busca una explosión inactiva entre las 5 disponibles. Máximo 5 explosiones simultáneas.
+spawn_explosion_in_slot:
+    # Activar explosión
+li $t2, 1
+sw $t2, 0($t0) # active = 1
+sw $a0, 4($t0) # x
+sw $a1, 8($t0) # y
+sw $zero, 12($t0) # frame = 0 (primer frame)
+sw $zero, 16($t0) # frame_counter = 0
+sw $a2, 20($t0) # size (0 o 1)
+Inicializa la explosión. La animación consta de 8 frames (0-7) que se van mostrando progresivamente para crear el efecto visual de explosión.
+
+4. SISTEMAS DE ACTUALIZACIÓN
+game_loop (Bucle Principal del Juego)
+Es el corazón del juego. Se ejecuta continuamente hasta que termine la partida (game over o victoria).
+game_loop:
+    # Verificar condiciones de fin de juego
+lw $t0, game_over_flag
+bnez $t0, game_over # Si flag=1, ir a game over
+
+lw $t0, game_won_flag
+bnez $t0, game_victory # Si flag=1, ir a victoria
+Primero verifica si el juego debe terminar (sin vidas o boss derrotado).
+# Incrementar timer del juego
+lw $t0, game_timer
+addi $t0, $t0, 1
+sw $t0, game_timer
+Mantiene un contador de frames para determinar cuándo activar el boss final (después de 600 frames = 10 segundos).
+# Verificar si activar portaaviones/boss final
+lw $t1, carrier_visible
+beqz $t1, hide_ready_screen # Si portaaviones ya no está, ocultar "READY"
+
+lw $t1, FINAL_SHIP_TRIGGER # 600 frames
+blt $t0, $t1, continue_normal_game
+
+    # Activar boss si no está activo
+lw $t2, boss_active
+bnez $t2, continue_normal_game
+
+lw $t3, boss_health
+bnez $t3, activate_boss # Si tiene vida, activar boss
+
+    # Si boss fue derrotado (health=0), activar barco final
+lw $t4, final_ship_active
+bnez $t4, continue_normal_game
+
+li $t4, 1
+sw $t4, final_ship_active
+
+Gestiona la progresión del juego:
+Si el portaaviones inicial desapareció, oculta la pantalla "READY"
+Después de 600 frames, activa el boss final
+Si el boss es derrotado, activa el barco final (objetivo de victoria)
+
+continue_normal_game:
+jal scroll_sea # Scrollear mar
+jal process_input # Procesar input del jugador
+
+    # SIEMPRE actualizar enemigos y balas (incluso con boss)
+jal update_enemies
+jal update_bullets
+
+    # Actualizar boss si está activo
+lw $t0, boss_active
+beqz $t0, no_boss_active
+jal update_boss
+j skip_enemy_spawn
+Orden de actualización crítico:
+
+Scrollear el mar primero (fondo)
+Procesar input del jugador
+Actualizar enemigos (siempre, incluso con boss)
+Actualizar balas (siempre)
+Actualizar boss (solo si está activo)
+
+no_boss_active:
+    # Solo spawnear enemigos si boss Y barco final NO están activos
+lw $t0, final_ship_active
+bnez $t0, skip_enemy_spawn
+jal spawn_enemy
+
+skip_enemy_spawn:
+jal update_player_bullets
+jal check_collisions # Colisiones jugador-balas enemigas
+jal check_bullet_enemy_collisions # Colisiones balas jugador-enemigos
+
+jal update_pow # Actualizar power-up
+jal update_explosions # Actualizar animaciones
+jal update_loop # Actualizar barrel roll
+Actualiza todos los sistemas del juego en orden lógico.
+# Actualizar barco final si está activo
+lw $t0, final_ship_active
+beqz $t0, skip_final_ship
+jal update_final_ship
+jal draw_final_ship
+
+skip_final_ship:
+    # Dibujar todo (orden de capas)
+jal draw_enemies
+jal draw_bullets
+jal draw_player_bullets
+jal draw_pow
+jal draw_explosions
+
+    # Boss encima de todo (excepto HUD)
+lw $t0, boss_active
+beqz $t0, skip_boss_draw
+jal draw_boss
+
+skip_boss_draw:
+jal draw_player_new # Jugador
+jal draw_hud # HUD (lo último, encima de todo)
+
+    # Pantalla READY si está activa
+lw $t0, show_ready_screen
+beqz $t0, skip_ready_screen
+jal draw_ready_screen
+
+skip_ready_screen:
+jal delay # Pausa para controlar FPS
+j game_loop # Repetir
+
+Orden de dibujado por capas (de fondo a frente):
+Mar (ya dibujado en scroll_sea)
+Barco final (si está activo)
+Enemigos
+Balas
+Power-ups
+Explosiones
+Boss (si está activo)
+Jugador
+HUD (siempre encima de todo)
+Pantalla "READY" (si está activa)
+
+Finalmente llama a delay para controlar la velocidad del juego (aproximadamente 60 FPS) y repite el ciclo.
+
+update_enemies / update_single_enemy
+Actualiza el comportamiento de todos los enemigos: movimiento, dirección, disparos y bounds checking.
+update_enemies:
+la $t0, enemy_0
+beqz $t0, skip_enemy_0 # Verificación de seguridad
+jal update_single_enemy
+
+la $t0, enemy_1
+beqz $t0, skip_enemy_1
+jal update_single_enemy
+
+la $t0, enemy_2
+beqz $t0, skip_enemy_2
+jal update_single_enemy
+Actualiza cada uno de los 3 enemigos posibles. Incluye verificaciones de seguridad para direcciones nulas.
+update_single_enemy:
+update_single_enemy:
+    # Guardar puntero del enemigo en $s0 (saved register)
+move $s0, $t0
+
+lw $t1, 0($s0)
+beqz $t1, update_enemy_end_safe # Si no está activo, salir
+Guarda el puntero en $s0 para preservarlo durante llamadas a funciones. Si el enemigo no está activo, termina inmediatamente.
+# Actualizar contador de movimiento
+lw $t7, 24($s0) # move_counter
+addi $t7, $t7, 1
+sw $t7, 24($s0)
+
+    # Verificar si debe moverse
+lw $t8, ENEMY_MOVE_RATE # 3 frames
+blt $t7, $t8, skip_enemy_move_safe
+
+    # Resetear contador
+sw $zero, 24($s0)
+Sistema de ralentización de movimiento: Los enemigos no se mueven cada frame, sino cada 3 frames (ENEMY_MOVE_RATE). Esto hace que se muevan a 1/3 de la velocidad del frame rate, creando un movimiento más controlado.
+# Guardar posición anterior (para borrado)
+lw $t2, 4($s0) # x actual
+lw $t3, 8($s0) # y actual
+sw $t2, 12($s0) # old_x = x
+sw $t3, 16($s0) # old_y = y
+
+    # Movimiento vertical (siempre hacia abajo)
+lw $t4, ENEMY_SPEED # 1 píxel
+add $t3, $t3, $t4 # y = y + 1
+sw $t3, 8($s0)
+Guarda la posición actual como "old" antes de mover. Después mueve el enemigo 1 píxel hacia abajo.
+Movimiento horizontal con rebote:
+# Leer dirección horizontal
+lw $t5, 32($s0) # direction (-1, 0, 1)
+beqz $t5, skip_horizontal_move # Si 0, no hay movimiento horizontal
+
+lw $t6, ENEMY_HORIZONTAL_SPEED # 1 píxel
+
+    # Aplicar movimiento según dirección
+bltz $t5, move_enemy_left # Si negativo, ir izquierda
+
+move_enemy_right:
+add $t2, $t2, $t6 # x += velocidad
+j check_horizontal_bounds
+
+move_enemy_left:
+sub $t2, $t2, $t6 # x -= velocidad
+Si el enemigo tiene dirección horizontal (!= 0), lo mueve en esa dirección.
+check_horizontal_bounds:
+    # Verificar límite izquierdo
+bltz $t2, bounce_enemy_right # Si X < 0, rebotar a derecha
+
+    # Verificar límite derecho
+lw $t8, ENEMY_SIZE # 9
+lw $t9, SCREEN_WIDTH # 64
+sub $t9, $t9, $t8 # límite = 64 - 9 = 55
+bgt $t2, $t9, bounce_enemy_left # Si X > 55, rebotar a izquierda
+j save_new_x
+
+bounce_enemy_right:
+li $t2, 0 # X = 0
+li $t5, 1 # Cambiar dirección a derecha
+sw $t5, 32($s0)
+j save_new_x
+
+bounce_enemy_left:
+move $t2, $t9 # X = límite (55)
+li $t5, -1 # Cambiar dirección a izquierda
+sw $t5, 32($s0)
+
+save_new_x:
+sw $t2, 4($s0) # Guardar nueva X
+Sistema de rebote: Cuando un enemigo alcanza un borde de la pantalla, no desaparece ni se desactiva. En su lugar:
+
+Se coloca justo en el borde (X=0 o X=55)
+Invierte su dirección de movimiento horizontal
+Continúa bajando y moviéndose en la dirección opuesta
+
+Esto crea patrones de movimiento en zigzag que son más interesantes y desafiantes.
+Cambio de dirección aleatorio:
+skip_horizontal_move:
+    # Cambiar dirección cada 10 frames
+lw $t7, 24($s0)
+lw $t8, ENEMY_DIRECTION_CHANGE_RATE # 10
+bne $t7, $t8, skip_direction_change
+
+    # Generar nueva dirección aleatoria (0-3)
+li $v0, 30
+syscall
+move $t9, $a0
+andi $t9, $t9, 0x3 # 0, 1, 2, 3
+
+li $a0, 2
+blt $t9, $a0, set_no_horizontal # 0 o 1 → sin movimiento
+beq $t9, $a0, set_left # 2 → izquierda
+    # 3 → derecha
+li $t9, 1
+sw $t9, 32($s0)
+j skip_direction_change
+
+set_left:
+li $t9, -1
+sw $t9, 32($s0)
+j skip_direction_change
+
+set_no_horizontal:
+sw $zero, 32($s0)
+Cada 10 frames (cuando move_counter == ENEMY_DIRECTION_CHANGE_RATE), el enemigo puede cambiar aleatoriamente su dirección de movimiento horizontal. Esto hace que los patrones sean menos predecibles.
+Sistema de disparo:
+skip_direction_change:
+    # Actualizar contador de disparo
+lw $t5, 20($s0) # shoot_counter
+addi $t5, $t5, 1
+sw $t5, 20($s0)
+
+    # Verificar si debe disparar
+lw $t6, ENEMY_SHOOT_RATE # 30 frames
+blt $t5, $t6, check_enemy_bounds_safe
+
+    # Resetear contador y disparar
+sw $zero, 20($s0)
+
+move $t0, $s0
+jal enemy_shoot # Llamar función de disparo
+Cada 30 frames, el enemigo dispara una bala. El contador se resetea después de disparar.
+check_enemy_bounds_safe:
+    # Desactivar si sale de la pantalla (por abajo)
+lw $t3, 8($s0) # y
+lw $t7, SCREEN_HEIGHT # 64
+bge $t3, $t7, deactivate_enemy_safe
+j update_enemy_end_safe
+
+deactivate_enemy_safe:
+    # Borrar enemigo visualmente antes de desactivar
+lw $a0, 12($s0) # old_x
+lw $a1, 16($s0) # old_y
+lw $a2, 28($s0) # type
+jal erase_enemy
+
+sw $zero, 0($s0) # active = 0
+Si el enemigo sale completamente de la pantalla por abajo (Y >= 64), se borra visualmente y se desactiva para liberar el slot.
+Nota importante: Los enemigos que salen por abajo NO restan vidas ni causan penalización. Simplemente se reciclan. Esto permite que el jugador tenga estrategias de "dodge" sin disparar.
+
+enemy_shoot
+Permite que un enemigo dispare una bala.
+enemy_shoot:
+move $s0, $t0 # Guardar puntero del enemigo
+
+    # Buscar slot libre para bala
+la $t1, bullet_0
+lw $t2, 0($t1)
+beqz $t2, enemy_shoot_in_slot
+    # ... bullet_1, bullet_2, bullet_3, bullet_4
+Busca una bala enemiga inactiva entre las 5 disponibles.
+enemy_shoot_in_slot:
+    # Activar bala
+li $t3, 1
+sw $t3, 0($t1) # active = 1
+
+    # Calcular posición de la bala (debajo del enemigo)
+lw $t4, 4($s0) # enemy_x
+lw $t5, 8($s0) # enemy_y
+
+lw $t6, ENEMY_SIZE # 9
+add $t5, $t5, $t6 # y = enemy_y + 9
+addi $t5, $t5, 2 # + 2 píxeles de separación
+
+    # Centrar bala horizontalmente
+lw $t6, ENEMY_SIZE # 9
+srl $t6, $t6, 1 # / 2 = 4.5 (4 en entero)
+add $t4, $t4, $t6 # x = enemy_x + 4
+
+lw $t6, BULLET_SIZE # 3
+srl $t6, $t6, 1 # / 2 = 1.5 (1 en entero)
+sub $t4, $t4, $t6 # x = x - 1 (centrar)
+
+sw $t4, 4($t1) # bullet_x
+sw $t5, 8($t1) # bullet_y
+sw $t4, 12($t1) # bullet_old_x
+sw $t5, 16($t1) # bullet_old_y
+Calcula la posición inicial de la bala:
+
+Y: justo debajo del enemigo (enemy_y + 9) más 2 píxeles de separación
+X: centrada horizontalmente con el enemigo
+
+Cálculo de centrado:
+
+enemy_center_x = enemy_x + (enemy_size / 2) = enemy_x + 4
+bullet_x = enemy_center_x - (bullet_size / 2) = enemy_center_x - 1
+
+Esto asegura que la bala salga del centro del enemigo visualmente.
+
+update_bullets
+Actualiza todas las balas enemigas: movimiento y bounds checking.
+update_bullets:
+la $s0, bullet_0
+move $t0, $s0
+jal update_single_bullet
+    # ... bullet_1, bullet_2, bullet_3, bullet_4
+update_single_bullet:
+update_single_bullet:
+move $s0, $t0 # Guardar puntero
+
+lw $t1, 0($s0)
+beqz $t1, update_bullet_end_safe # Si no activa, salir
+
+    # Guardar posición anterior
+lw $t2, 4($s0) # x
+lw $t3, 8($s0) # y
+sw $t2, 12($s0) # old_x = x
+sw $t3, 16($s0) # old_y = y
+
+    # Mover hacia abajo
+lw $t4, BULLET_SPEED # 2 píxeles
+add $t3, $t3, $t4 # y = y + 2
+sw $t3, 8($s0)
+Guarda posición anterior y mueve la bala 2 píxeles hacia abajo cada frame.
+# Desactivar si sale de pantalla
+lw $t5, SCREEN_HEIGHT # 64
+bge $t3, $t5, deactivate_bullet_safe
+j update_bullet_end_safe
+
+deactivate_bullet_safe:
+    # Borrar bala visualmente
+lw $a0, 12($s0) # old_x
+lw $a1, 16($s0) # old_y
+jal erase_bullet
+
+sw $zero, 0($s0) # active = 0
+Si la bala sale por abajo (Y >= 64), se borra visualmente y se desactiva.
+
+update_player_bullets / update_single_player_bullet
+Actualiza las balas disparadas por el jugador (movimiento hacia arriba).
+Similar a update_bullets pero con diferencias clave:
+update_single_player_bullet:
+    # ... (guardar posición anterior)
+
+    # Mover hacia ARRIBA
+lw $t4, PLAYER_BULLET_SPEED # 2 píxeles
+sub $t3, $t3, $t4 # y = y - 2 (RESTA, no suma)
+sw $t3, 8($s0)
+
+    # Desactivar si sale por ARRIBA
+bltz $t3, deactivate_player_bullet_safe # Si Y < 0
+Las balas del jugador:
+
+Se mueven hacia arriba (resta en Y)
+Se desactivan si salen por arriba (Y < 0)
+
+
+spawn_player_bullet
+Crea una o dos balas del jugador (dependiendo del power-up de disparo doble).
+spawn_player_bullet:
+    # Verificar si puede disparar
+lw $t0, player_can_shoot
+beqz $t0, spawn_player_done # Si no puede, salir
+
+    # Verificar si tiene power-up activo
+lw $t9, double_shot_active
+beqz $t9, spawn_single_bullet # Si no, disparo normal
+Primero verifica si el jugador puede disparar y si tiene el power-up de disparo doble activo.
+Sistema de disparo doble:
+# DOBLE DISPARO
+    # Buscar dos slots libres
+la $t0, player_bullet_0
+lw $t1, 0($t0)
+beqz $t1, found_first_slot
+    # ... continúa buscando...
+
+found_first_slot:
+    # Activar primera bala (IZQUIERDA)
+li $t2, 1
+sw $t2, 0($t0)
+
+    # Calcular posición IZQUIERDA
+lw $t3, player_x
+addi $t3, $t3, 3 # Offset izquierdo (x + 3)
+lw $t4, player_y
+
+sw $t3, 4($t0)
+sw $t4, 8($t0)
+sw $t3, 12($t0)
+sw $t4, 16($t0)
+
+move $s7, $t0 # Guardar primer slot
+Crea la primera bala en el lado izquierdo del avión (x + 3).
+find_second_slot:
+    # Buscar segundo slot (diferente del primero)
+la $t0, player_bullet_0
+beq $t0, $s7, try_bullet_1 # Si es el mismo, probar siguiente
+lw $t1, 0($t0)
+beqz $t1, found_second_slot
+    # ... continúa buscando...
+
+found_second_slot:
+    # Activar segunda bala (DERECHA)
+li $t2, 1
+sw $t2, 0($t0)
+
+    # Calcular posición DERECHA
+lw $t3, player_x
+addi $t3, $t3, 9 # Offset derecho (x + 9)
+lw $t4, player_y
+
+sw $t3, 4($t0)
+sw $t4, 8($t0)
+sw $t3, 12($t0)
+sw $t4, 16($t0)
+Crea la segunda bala en el lado derecho del avión (x + 9).
+
+Cálculo de posiciones:
+Avión del jugador: 12 píxeles de ancho
+Bala izquierda: x + 3 (aproximadamente 1/4 del ancho)
+Bala derecha: x + 9 (aproximadamente 3/4 del ancho)
+
+Esto crea un patrón de disparo en V que se ve profesional y permite cubrir más área.
+decrease_ammo:
+    # Reducir munición del power-up
+lw $t5, double_shot_ammo
+addi $t5, $t5, -1
+sw $t5, double_shot_ammo
+
+    # Si se acabó la munición, desactivar power-up
+bgtz $t5, spawn_player_done # Si > 0, continuar
+sw $zero, double_shot_active # Si = 0, desactivar
+
+Cada disparo doble consume 1 de munición. Cuando llega a 0, el power-up se desactiva automáticamente y el jugador vuelve al disparo normal.
+Disparo normal (sin power-up):
+spawn_single_bullet:
+    # Buscar slot libre
+la $t0, player_bullet_0
+lw $t1, 0($t0)
+beqz $t1, spawn_player_in_slot
+    # ... continúa buscando hasta player_bullet_9
+
+spawn_player_in_slot:
+    # Activar bala
+li $t2, 1
+sw $t2, 0($t0)
+
+    # Calcular posición (centro del avión)
+lw $t3, player_x
+lw $t4, PLAYER_SIZE # 12
+srl $t4, $t4, 1 # / 2 = 6
+add $t3, $t3, $t4 # x_center = player_x + 6
+
+lw $t5, PLAYER_BULLET_WIDTH # 1
+srl $t5, $t5, 1 # / 2 = 0
+sub $t3, $t3, $t5 # x_bullet = x_center - 0
+
+lw $t4, player_y # y = player_y (arriba del avión)
+
+sw $t3, 4($t0)
+sw $t4, 8($t0)
+sw $t3, 12($t0)
+sw $t4, 16($t0)
+Disparo normal: una sola bala centrada horizontalmente en el avión.
+
+update_pow
+Actualiza el movimiento y colisiones del power-up POW.
+update_pow:
+lw $t0, pow_active
+beqz $t0, update_pow_done # Si no activo, salir
+
+    # Incrementar contador de movimiento
+lw $t1, pow_move_counter
+addi $t1, $t1, 1
+sw $t1, pow_move_counter
+
+    # Verificar si debe moverse
+lw $t2, POW_MOVE_RATE # 5 frames
+blt $t1, $t2, update_pow_done
+
+    # Resetear contador
+sw $zero, pow_move_counter
+El POW se mueve solo cada 5 frames, haciéndolo caer mucho más lento que las balas.
+mips # Guardar posición anterior
+lw $t3, pow_x
+lw $t4, pow_y
+sw $t3, pow_old_x
+sw $t4, pow_old_y
+
+    # Mover hacia abajo
+lw $t5, POW_SPEED # 1 píxel
+add $t4, $t4, $t5
+sw $t4, pow_y
+Guarda posición anterior y mueve 1 píxel hacia abajo.
+mips # Verificar si sale de pantalla
+lw $t6, SCREEN_HEIGHT # 64
+bge $t4, $t6, deactivate_pow
+
+    # Verificar colisión con jugador
+jal check_pow_collision
+j update_pow_done
+
+deactivate_pow:
+    # Borrar POW antes de desactivar
+lw $a0, pow_old_x
+lw $a1, pow_old_y
+jal erase_pow
+
+sw $zero, pow_active # Desactivar
+Si sale de pantalla, se borra y desactiva. Si no, verifica colisión con el jugador.
+
+check_pow_collision
+Detecta colisión entre el jugador y el power-up usando AABB (Axis-Aligned Bounding Box).
+check_pow_collision:
+lw $t0, pow_x
+lw $t1, pow_y
+lw $t2, player_x
+lw $t3, player_y
+
+    # AABB collision: verificar superposición de rectángulos
+
+    # Verificar X: ¿Se superponen horizontalmente?
+lw $t4, PLAYER_SIZE # 12
+add $t4, $t2, $t4 # player_right = player_x + 12
+blt $t4, $t0, no_pow_collision # Si player_right < pow_left, no colisionan
+
+lw $t5, POW_SIZE # 7
+add $t5, $t0, $t5 # pow_right = pow_x + 7
+blt $t5, $t2, no_pow_collision # Si pow_right < player_left, no colisionan
+Algoritmo AABB: Dos rectángulos colisionan si:
+
+Se superponen en X (player_right > pow_left AND pow_right > player_left)
+Y además se superponen en Y (player_bottom > pow_top AND pow_bottom > player_top)
+
+Si NO se superponen en algún eje, no hay colisión.
+mips # Verificar Y: ¿Se superponen verticalmente?
+lw $t4, PLAYER_HEIGHT # 8
+add $t4, $t3, $t4 # player_bottom = player_y + 8
+blt $t4, $t1, no_pow_collision # Si player_bottom < pow_top, no colisionan
+
+lw $t5, POW_SIZE # 7
+add $t5, $t1, $t5 # pow_bottom = pow_y + 7
+blt $t5, $t3, no_pow_collision # Si pow_bottom < player_top, no colisionan
+Si pasa ambas verificaciones, hay colisión.
+mips # ¡COLISIÓN! Activar power-up
+li $t6, 1
+sw $t6, double_shot_active # Activar disparo doble
+li $t7, 5
+sw $t7, double_shot_ammo # 5 disparos dobles
+
+    # Borrar POW visualmente
+lw $a0, pow_old_x
+lw $a1, pow_old_y
+jal erase_pow
+
+    # Desactivar POW
+sw $zero, pow_active
+
+no_pow_collision:
+    # (retornar)
+Al agarrar el POW:
+
+Activa el modo de disparo doble
+Otorga 5 disparos con doble bala
+Borra el POW visualmente
+Desactiva el POW (libera el slot para que pueda aparecer otro después)
+
+
+update_explosions / update_single_explosion
+Actualiza las animaciones de explosión (8 frames).
+update_explosions:
+la $s0, explosion_0
+move $t0, $s0
+jal update_single_explosion
+    # ... explosion_1, explosion_2, explosion_3, explosion_4
+update_single_explosion:
+update_single_explosion:
+move $s0, $t0 # Guardar puntero
+
+lw $t1, 0($s0)
+beqz $t1, update_explosion_end # Si no activa, salir
+
+    # Incrementar contador de frames
+lw $t2, 16($s0) # frame_counter
+addi $t2, $t2, 1
+sw $t2, 16($s0)
+
+    # Verificar si cambiar de frame
+lw $t3, EXPLOSION_FRAME_RATE # 3 frames
+blt $t2, $t3, update_explosion_end
+La animación no avanza cada frame, sino cada 3 frames. Esto hace que la explosión dure 24 frames totales (8 frames de animación × 3 frames cada uno).
+mips # Resetear contador
+sw $zero, 16($s0)
+
+    # Avanzar al siguiente frame de animación
+lw $t4, 12($s0) # frame actual (0-7)
+addi $t4, $t4, 1
+
+    # Si llegó al frame 8, desactivar explosión
+li $t5, 8
+bge $t4, $t5, deactivate_explosion
+
+    # Guardar nuevo frame
+sw $t4, 12($s0)
+j update_explosion_end
+
+deactivate_explosion:
+sw $zero, 0($s0) # active = 0 (explosión terminada)
+Cuando llega al frame 8 (después del frame 7), la explosión termina y se desactiva automáticamente.
+Ciclo de vida de una explosión:
+
+Frame 0-2: Sprite 0 (inicio de explosión)
+Frame 3-5: Sprite 1 (expansión)
+Frame 6-8: Sprite 2 (más grande)
+Frame 9-11: Sprite 3 (máxima expansión)
+Frame 12-14: Sprite 4 (empezando a disiparse)
+Frame 15-17: Sprite 5 (más disipada)
+Frame 18-20: Sprite 6 (casi desaparecida)
+Frame 21-23: Sprite 7 (últimas chispas)
+Frame 24+: Desactivada
+
+
+update_loop
+Controla la animación y duración del barrel roll (maniobra especial del jugador).
+update_loop:
+    # Actualizar cooldown
+lw $t0, loop_cooldown
+beqz $t0, check_loop_active # Si 0, no hay cooldown
+addi $t0, $t0, -1 # Decrementar cooldown
+sw $t0, loop_cooldown
+Si hay cooldown activo, lo decrementa cada frame. Cuando llega a 0, el loop vuelve a estar disponible.
+check_loop_active:
+lw $t1, loop_active
+beqz $t1, update_loop_done # Si no está activo, salir
+
+    # Incrementar contador de frames de animación
+lw $t2, loop_frame_counter
+addi $t2, $t2, 1
+sw $t2, loop_frame_counter
+
+    # Verificar si cambiar de frame
+lw $t3, LOOP_FRAME_RATE # 2 frames
+blt $t2, $t3, update_loop_done
+Durante el loop, la animación avanza cada 2 frames (más rápido que las explosiones).
+mips # Resetear contador
+sw $zero, loop_frame_counter
+
+    # Avanzar al siguiente frame
+lw $t4, loop_frame
+addi $t4, $t4, 1
+
+    # Si llegó al frame 8, desactivar loop
+li $t5, 8
+bge $t4, $t5, deactivate_loop
+
+    # Guardar nuevo frame
+sw $t4, loop_frame
+j update_loop_done
+
+deactivate_loop:
+sw $zero, loop_active # Desactivar loop
+sw $zero, loop_invulnerable # Quitar invulnerabilidad
+sw $zero, loop_frame # Resetear frame
+El loop tiene 8 frames de animación (0-7). Cuando termina:
+
+Desactiva el loop
+Quita la invulnerabilidad (el jugador vuelve a ser vulnerable)
+Resetea el frame a 0
+
+Duración total del loop: 16 frames (8 frames de animación × 2 frames cada uno).
+
+activate_loop
+Activa la maniobra de barrel roll cuando el jugador presiona la tecla K.
+activate_loop:
+    # Verificar cooldown
+lw $t0, loop_cooldown
+bnez $t0, activate_loop_done # Si hay cooldown, no permitir
+
+    # Verificar que no esté ya activo
+lw $t1, loop_active
+bnez $t1, activate_loop_done # Si ya está activo, no reiniciar
+No permite activar el loop si:
+
+Está en cooldown (debe esperar 600 frames = 10 segundos)
+Ya está ejecutándose un loop
+
+mips # Activar loop
+li $t2, 1
+sw $t2, loop_active # loop_active = 1
+sw $t2, loop_invulnerable # loop_invulnerable = 1
+sw $zero, loop_frame # frame = 0
+sw $zero, loop_frame_counter # frame_counter = 0
+
+    # Establecer cooldown
+lw $t3, LOOP_COOLDOWN_TIME # 600 frames (10 segundos)
+sw $t3, loop_cooldown
+Al activar el loop:
+
+Marca el loop como activo
+Activa la invulnerabilidad (el jugador no puede ser dañado durante el loop)
+Resetea los contadores de animación
+Establece el cooldown de 10 segundos
+
+Mecánica de gameplay: El barrel roll es una maniobra defensiva que permite al jugador:
+
+Esquivar balas durante 16 frames (invulnerable)
+Crear espacio en situaciones complicadas
+Pero no puede ser spameada (cooldown de 10 segundos)
+
+Esto añade profundidad estratégica al juego: el jugador debe decidir cuándo usar su habilidad defensiva.
+
+update_boss
+Actualiza el comportamiento del boss final: movimiento, disparos y patrón de ataque.
+update_boss:
+    # Guardar posición anterior
+lw $t0, boss_x
+lw $t1, boss_y
+sw $t0, boss_old_x
+sw $t1, boss_old_y
+Guarda la posición anterior para el sistema de borrado.
+mips # Incrementar contador de movimiento
+lw $t2, boss_move_counter
+addi $t2, $t2, 1
+sw $t2, boss_move_counter
+
+lw $t3, BOSS_MOVE_RATE # 5 frames
+blt $t2, $t3, boss_check_shoot
+
+    # Resetear contador
+sw $zero, boss_move_counter
+El boss se mueve cada 5 frames (más lento que enemigos normales).
+Fase 1: Entrada del boss
+mips # Mover verticalmente hacia abajo hasta Y=5
+li $t4, 5 # Posición objetivo
+bge $t1, $t4, boss_move_horizontal # Si ya llegó, pasar a fase 2
+
+lw $t5, BOSS_MOVE_SPEED # 1 píxel
+add $t1, $t1, $t5 # y = y + 1
+sw $t1, boss_y
+j boss_check_shoot
+El boss aparece desde arriba (Y = -27, fuera de pantalla) y baja hasta Y = 5. Durante esta fase solo baja, no se mueve horizontalmente.
+Fase 2: Patrón de movimiento horizontal
+boss_move_horizontal:
+    # Mover horizontalmente con rebote
+lw $t5, boss_direction # 1 o -1
+lw $t6, BOSS_MOVE_SPEED # 1 píxel
+
+bltz $t5, boss_move_left_dir # Si dirección < 0, ir izquierda
+add $t0, $t0, $t6 # Mover derecha
+j boss_check_bounds
+
+boss_move_left_dir:
+sub $t0, $t0, $t6 # Mover izquierda
+Una vez en posición Y=5, el boss se mueve horizontalmente de lado a lado.
+boss_check_bounds:
+    # Verificar límites (0 a 37)
+bltz $t0, boss_bounce_right # Si X < 0, rebotar
+li $t7, 37 # 64 - 27 (tamaño boss) = 37
+bgt $t0, $t7, boss_bounce_left # Si X > 37, rebotar
+sw $t0, boss_x
+j boss_check_shoot
+
+boss_bounce_right:
+li $t0, 0
+sw $t0, boss_x
+li $t5, 1 # Cambiar dirección a derecha
+sw $t5, boss_direction
+j boss_check_shoot
+
+boss_bounce_left:
+li $t0, 37
+sw $t0, boss_x
+li $t5, -1 # Cambiar dirección a izquierda
+sw $t5, boss_direction
+Sistema de rebote similar a los enemigos: al alcanzar un borde, rebota e invierte su dirección.
+Sistema de disparo:
+boss_check_shoot:
+    # Actualizar contador de disparo
+lw $t0, boss_shoot_counter
+addi $t0, $t0, 1
+sw $t0, boss_shoot_counter
+
+lw $t1, BOSS_SHOOT_RATE # 60 frames (1 segundo)
+blt $t0, $t1, boss_no_shoot
+
+    # Resetear contador y disparar
+sw $zero, boss_shoot_counter
+jal boss_shoot
+
+boss_no_shoot:
+    # (retornar)
+El boss dispara cada 60 frames. Llama a boss_shoot que crea un patrón de 3 balas.
+
+boss_shoot
+El boss dispara 3 balas simultáneamente en un patrón.
+boss_shoot:
+    # Posición del boss
+lw $t4, boss_x
+lw $t5, boss_y
+
+    # Calcular Y de disparo (debajo del boss)
+addi $t5, $t5, 27 # boss_y + 27 (tamaño)
+addi $t5, $t5, 2 # + 2 píxeles de separación
+Las balas salen justo debajo del boss con 2 píxeles de separación.
+BALA IZQUIERDA:
+mips # Buscar slot libre para bala izquierda
+la $t1, bullet_0
+lw $t2, 0($t1)
+bnez $t2, try_bullet_1_left # Si ocupada, probar siguiente
+
+    # Activar bala izquierda
+li $t3, 1
+sw $t3, 0($t1)
+
+addi $t6, $t4, 3 # x = boss_x + 3 (lado izquierdo)
+sw $t6, 4($t1)
+sw $t5, 8($t1)
+sw $t6, 12($t1)
+sw $t5, 16($t1)
+BALA CENTRAL:
+mips # Buscar slot para bala central
+la $t1, bullet_2
+lw $t2, 0($t1)
+bnez $t2, try_bullet_3_center
+
+    # Activar bala central
+li $t3, 1
+sw $t3, 0($t1)
+
+addi $t6, $t4, 12 # x = boss_x + 12 (centro, 27/2 ≈ 13)
+sw $t6, 4($t1)
+sw $t5, 8($t1)
+sw $t6, 12($t1)
+sw $t5, 16($t1)
+BALA DERECHA:
+mips # Buscar slot para bala derecha
+la $t1, bullet_4
+lw $t2, 0($t1)
+bnez $t2, try_bullet_0_right
+
+    # Activar bala derecha
+li $t3, 1
+sw $t3, 0($t1)
+
+addi $t6, $t4, 21 # x = boss_x + 21 (lado derecho)
+sw $t6, 4($t1)
+sw $t5, 8($t1)
+sw $t6, 12($t1)
+sw $t5, 16($t1)
+```
+
+Patrón de disparo del boss:
+```
+[BOSS: 27 píxeles de ancho]
+| |  |
+3 12 21
+↓ ↓ ↓
+* * *
+Este patrón de 3 balas hace que sea más difícil esquivar al boss, requiriendo movimientos más precisos del jugador.
+
+update_final_ship
+Actualiza el barco final (objetivo de victoria).
+update_final_ship:
+    # Mover el barco hacia abajo (apareciendo desde arriba)
+lw $t0, final_ship_y_offset
+lw $t1, final_ship_scroll_speed # 1 píxel
+add $t0, $t0, $t1 # y_offset = y_offset + 1
+sw $t0, final_ship_y_offset
+El barco final empieza en Y = -48 (completamente fuera de pantalla arriba) y baja lentamente 1 píxel por frame.
+mips # Verificar si el barco está completamente visible
+li $t2, 8 # Barco visible cuando Y >= 8
+blt $t0, $t2, update_final_ship_done
+
+    # Barco completamente visible - ¡VICTORIA!
+li $t3, 1
+sw $t3, game_won_flag # Activar flag de victoria
+Cuando el barco final es visible (Y >= 8), el juego termina en victoria.
+
+Secuencia de victoria:
+- El jugador derrota al boss
+- El barco final empieza a aparecer desde arriba
+- El jugador debe sobrevivir mientras el barco baja (todavía hay balas y enemigos)
+- Cuando el barco está visible, el jugador gana
+
+Esto crea un momento final épico donde el jugador debe resistir un poco más después de derrotar al boss.
+
+5. FUNCIONES DE DIBUJADO
+draw_player_new
+Dibuja el avión del jugador en su posición actual, usando el sprite normal o el sprite del loop según el estado.
+draw_player_new:
+lw $t0, player_x
+lw $t1, player_y
+lw $t9, PLAYER_SIZE # 12 píxeles de ancho
+lw $s7, PLAYER_HEIGHT # 8 píxeles de alto
+
+    # Verificar si está haciendo loop
+lw $t8, loop_active
+beqz $t8, use_normal_sprite # Si no, usar sprite normal
+Primero verifica si el jugador está ejecutando el barrel roll.
+Selección de sprite:
+mips # Usar sprite del loop
+lw $t8, loop_frame # Frame actual (0-7)
+la $s0, loop_sprite_table # Tabla de punteros
+sll $t8, $t8, 2 # * 4 (tamaño de word)
+add $s0, $s0, $t8
+lw $s0, 0($s0) # Cargar puntero al sprite
+j draw_player_sprite
+
+use_normal_sprite:
+la $s0, plane_sprite # Sprite normal
+Si está haciendo loop, obtiene el sprite correspondiente al frame actual de la tabla loop_sprite_table. Si no, usa el sprite normal del avión.
+draw_player_sprite:
+lw $s1, plane_gray # Color 1
+lw $s2, plane_white # Color 2
+lw $s3, plane_salmon # Color 3
+
+li $t5, 0 # Contador Y
+
+new_y_loop:
+bge $t5, $s7, new_done # Si Y >= altura, terminar
+
+li $t6, 0 # Contador X
+
+new_x_loop:
+bge $t6, $t9, new_next_row # Si X >= ancho, siguiente fila
+Recorre cada píxel del sprite (12x8 = 96 píxeles).
+mips # Obtener índice del sprite (Y * 12 + X)
+sll $t7, $t5, 3 # Y * 8
+sll $a3, $t5, 2 # Y * 4
+add $t7, $t7, $a3 # Y * 12
+add $t7, $t7, $t6 # + X
+add $t8, $s0, $t7
+lb $t8, 0($t8) # Valor del píxel (0-3)
+Calcula el índice en el sprite. Cada fila tiene 12 píxeles, entonces: índice = Y * 12 + X.
+mips # Si es 0, es transparente (no dibujar)
+beqz $t8, skip_pixel
+
+    # Seleccionar color según valor
+li $a0, 1
+beq $t8, $a0, use_gray # 1 = gris
+li $a0, 2
+beq $t8, $a0, use_white # 2 = blanco
+li $a0, 3
+beq $t8, $a0, use_salmon # 3 = salmón
+j skip_pixel
+
+use_gray:
+move $a1, $s1
+j draw_pixel
+use_white:
+move $a1, $s2
+j draw_pixel
+use_salmon:
+move $a1, $s3
+Mapea los valores del sprite a colores RGB:
+
+0: transparente (no dibuja)
+1: gris (sombras)
+2: blanco (cuerpo principal)
+3: salmón (detalles/cabina)
+
+draw_pixel:
+    # Calcular offset en display
+add $a2, $t1, $t5 # Y_pantalla = player_y + offset_y
+sll $a2, $a2, 6 # * 64 (ancho de pantalla)
+add $a2, $a2, $t0 # + player_x
+add $a2, $a2, $t6 # + offset_x
+sll $a2, $a2, 2 # * 4 (bytes por píxel)
+add $a2, $gp, $a2 # + dirección base del framebuffer
+
+sw $a1, 0($a2) # Escribir color al display
+
+skip_pixel:
+addi $t6, $t6, 1 # Siguiente X
+j new_x_loop
+
+Calcula la dirección de memoria en el framebuffer y escribe el color.
+
+Cálculo de dirección:
+dirección = base + ((Y * 64 + X) * 4)
+
+Donde:
+base = $gp (dirección del framebuffer)
+Y = fila en pantalla
+X = columna en pantalla
+64 = ancho de pantalla en píxeles
+4 = bytes por píxel (RGBA de 32 bits)
+
+
+draw_enemies / draw_single_enemy / draw_enemy_at
+Dibuja los enemigos según su tipo (gris, verde o amarillo).
+draw_enemies:
+la $s0, enemy_0
+move $t0, $s0
+jal draw_single_enemy
+    # ... enemy_1, enemy_2
+draw_single_enemy:
+draw_single_enemy:
+move $s0, $t0 # Guardar puntero
+
+    # Verificación de seguridad (alineación y no NULL)
+andi $t9, $s0, 0x3
+bnez $t9, draw_enemy_end # Si no alineado a 4 bytes, salir
+
+beqz $s0, draw_enemy_end # Si NULL, salir
+
+lw $t1, 0($s0)
+beqz $t1, draw_enemy_end # Si no activo, salir
+Verificaciones de seguridad importantes:
+
+Alineación: Verifica que la dirección sea múltiplo de 4 (alineada a word)
+NULL: Verifica que no sea dirección 0
+Activo: Verifica que el enemigo esté activo
+
+mips # Verificar tipo de enemigo
+lw $t2, 28($s0) # type (0, 1, o 2)
+
+    # Borrar posición anterior
+lw $a0, 12($s0) # old_x
+lw $a1, 16($s0) # old_y
+move $a2, $t2 # type (para erase_enemy)
+jal erase_enemy
+
+    # Dibujar en nueva posición
+lw $a0, 4($s0) # x
+lw $a1, 8($s0) # y
+lw $a2, 28($s0) # type
+jal draw_enemy_at
+Borra el enemigo de su posición anterior y lo dibuja en la nueva posición.
+draw_enemy_at:
+draw_enemy_at:
+    # Verificar tipo (en $a2: 0=gris, 1=verde, 2=amarillo)
+beqz $a2, draw_enemy_type_1 # Tipo 0 → gris
+li $t9, 1
+beq $a2, $t9, draw_enemy_type_2 # Tipo 1 → verde
+li $t9, 2
+beq $a2, $t9, draw_enemy_type_3 # Tipo 2 → amarillo
+Despacha al código de dibujado correcto según el tipo.
+
+Ejemplo: Dibujar enemigo tipo 3 (amarillo):
+draw_enemy_type_3:
+move $t0, $a0 # x position
+move $t1, $a1 # y position
+lw $t2, ENEMY_SIZE # 9x9
+
+la $s0, enemy3_sprite # Sprite amarillo
+lw $s1, enemy3_yellow # Color 1: amarillo
+lw $s2, enemy3_red # Color 2: rojo
+lw $s3, enemy3_white # Color 3: blanco
+
+li $t4, 0 # Y counter
+
+draw_enemy3_y:
+bge $t4, $t2, draw_enemy_done_loop
+
+li $t5, 0 # X counter
+
+draw_enemy3_x:
+bge $t5, $t2, draw_enemy3_next_y
+
+    # Obtener índice del sprite (Y * 9 + X)
+sll $t6, $t4, 3 # Y * 8
+add $t6, $t6, $t4 # Y * 9
+add $t6, $t6, $t5 # + X
+add $t7, $s0, $t6
+lb $t7, 0($t7) # Valor del píxel (0-3)
+
+    # Si es 0, es transparente
+beqz $t7, skip_enemy3_pixel
+
+    # Seleccionar color según valor
+li $t8, 1
+beq $t7, $t8, use_enemy3_yellow # 1 = amarillo (cuerpo)
+li $t8, 2
+beq $t7, $t8, use_enemy3_red # 2 = rojo (detalles)
+li $t8, 3
+beq $t7, $t8, use_enemy3_white # 3 = blanco (cabina)
+j skip_enemy3_pixel
+
+use_enemy3_yellow:
+move $t9, $s1
+j draw_enemy3_pixel
+use_enemy3_red:
+move $t9, $s2
+j draw_enemy3_pixel
+use_enemy3_white:
+move $t9, $s3
+
+draw_enemy3_pixel:
+add $s4, $t1, $t4 # Y_pantalla
+sll $s4, $s4, 6 # * 64
+add $s4, $s4, $t0 # + X_pantalla
+add $s4, $s4, $t5 # + offset
+sll $s4, $s4, 2 # * 4
+add $s4, $gp, $s4 # + base
+
+sw $t9, 0($s4) # Escribir color
+
+skip_enemy3_pixel:
+addi $t5, $t5, 1
+j draw_enemy3_x
+
+draw_enemy3_next_y:
+addi $t4, $t4, 1
+j draw_enemy3_y
+Los tipos 1 (gris) y 2 (verde) son idénticos en estructura, solo cambian los sprites y colores usados.
+Diferencias entre tipos de enemigos:
+
+Tipo 0 (gris): Sprites grises, 50 puntos
+Tipo 1 (verde): Sprites verdes, 100 puntos
+Tipo 2 (amarillo): Sprites amarillos, 150 puntos
+
+Todos tienen el mismo tamaño (9x9) y comportamiento, solo difieren visualmente y en puntuación.
+
+draw_bullets / draw_single_bullet / draw_bullet_at
+Dibuja las balas enemigas (sprite 3x3 en forma de cruz).
+draw_bullets:
+la $s0, bullet_0
+move $t0, $s0
+jal draw_single_bullet
+    # ... bullet_1, bullet_2, bullet_3, bullet_4
+draw_single_bullet:
+draw_single_bullet:
+move $s0, $t0
+
+    # Verificaciones de seguridad
+andi $t9, $s0, 0x3
+bnez $t9, draw_single_bullet_end
+beqz $s0, draw_single_bullet_end
+
+lw $t1, 0($s0)
+beqz $t1, draw_single_bullet_end
+
+    # Borrar posición anterior
+lw $a0, 12($s0) # old_x
+lw $a1, 16($s0) # old_y
+jal erase_bullet
+
+    # Dibujar en nueva posición
+lw $a0, 4($s0) # x
+lw $a1, 8($s0) # y
+jal draw_bullet_at
+draw_bullet_at:
+draw_bullet_at:
+move $t0, $a0 # x position
+move $t1, $a1 # y position
+lw $t2, BULLET_SIZE # 3x3
+
+la $s0, bullet_sprite # Sprite en forma de cruz
+lw $s1, bullet_yellow # Amarillo (bordes)
+lw $s2, bullet_red # Rojo (centro)
+
+Sprite de bala (3x3):
+Y (Y=amarillo, R=rojo)
+YRY
+Y
+
+Este patrón crea una bala en forma de cruz que es visualmente clara en pantalla.
+mips li $t4, 0 # Y counter
+
+draw_bullet_y:
+bge $t4, $t2, draw_bullet_done_loop
+
+li $t5, 0 # X counter
+
+draw_bullet_x:
+bge $t5, $t2, draw_bullet_next_y
+
+    # Obtener índice del sprite (Y * 3 + X)
+sll $t6, $t4, 1 # Y * 2
+add $t6, $t6, $t4 # Y * 3
+add $t6, $t6, $t5 # + X
+add $t7, $s0, $t6
+lb $t7, 0($t7) # Valor del píxel (0-2)
+
+    # Si es 0, es transparente
+beqz $t7, skip_bullet_pixel
+
+    # Seleccionar color
+li $t8, 1
+beq $t7, $t8, use_bullet_yellow # 1 = amarillo
+li $t8, 2
+beq $t7, $t8, use_bullet_red # 2 = rojo
+j skip_bullet_pixel
+
+use_bullet_yellow:
+move $t3, $s1
+j draw_bullet_pixel
+use_bullet_red:
+move $t3, $s2
+
+draw_bullet_pixel:
+    # Calcular offset en display
+add $t6, $t1, $t4
+sll $t6, $t6, 6
+add $t6, $t6, $t0
+add $t6, $t6, $t5
+sll $t6, $t6, 2
+add $t6, $gp, $t6
+
+sw $t3, 0($t6)
+
+skip_bullet_pixel:
+addi $t5, $t5, 1
+j draw_bullet_x
+
+draw_player_bullets / draw_single_player_bullet / draw_player_bullet_at
+Dibuja las balas del jugador (sprite 1x3 vertical).
+draw_player_bullet_at:
+draw_player_bullet_at:
+move $t0, $a0 # x position
+move $t1, $a1 # y position
+lw $t2, PLAYER_BULLET_WIDTH # 1
+lw $t3, PLAYER_BULLET_HEIGHT # 3
+
+la $s0, player_bullet_sprite # Sprite vertical
+lw $s1, player_bullet_yellow # Amarillo (punta)
+lw $s2, player_bullet_red # Rojo (cuerpo)
+```
+
+Sprite de bala del jugador (1x3):
+Y (punta amarilla)
+R (cuerpo rojo)
+R (cuerpo rojo)
+Este diseño vertical se ve como un proyectil clásico de shooter.
+mips li $t4, 0 # Y counter
+
+draw_player_bullet_y:
+bge $t4, $t3, draw_player_bullet_done_loop
+
+li $t5, 0 # X counter (siempre 0, ancho=1)
+
+draw_player_bullet_x:
+bge $t5, $t2, draw_player_bullet_next_y
+
+    # Obtener índice del sprite (Y * 1 + X = Y)
+add $t6, $t4, $t5
+add $t7, $s0, $t6
+lb $t7, 0($t7) # Valor del píxel (1-2)
+
+    # Seleccionar color
+li $t8, 1
+beq $t7, $t8, use_player_yellow # 1 = amarillo (punta)
+li $t8, 2
+beq $t7, $t8, use_player_red # 2 = rojo (cuerpo)
+j skip_player_bullet_pixel
+
+use_player_yellow:
+move $t9, $s1
+j draw_player_bullet_pixel
+use_player_red:
+move $t9, $s2
+
+draw_player_bullet_pixel:
+add $s3, $t1, $t4 # Y_pantalla
+sll $s3, $s3, 6
+add $s3, $s3, $t0
+add $s3, $s3, $t5
+sll $s3, $s3, 2
+add $s3, $gp, $s3
+
+sw $t9, 0($s3)
+
+skip_player_bullet_pixel:
+addi $t5, $t5, 1
+j draw_player_bullet_x
+
+draw_pow / draw_pow_at
+Dibuja el power-up POW (estrella verde 7x7).
+draw_pow:
+lw $t0, pow_active
+beqz $t0, draw_pow_done # Si no activo, salir
+
+    # Borrar posición anterior
+lw $a0, pow_old_x
+lw $a1, pow_old_y
+jal erase_pow
+
+    # Dibujar en nueva posición
+lw $a0, pow_x
+lw $a1, pow_y
+jal draw_pow_at
+draw_pow_at:
+draw_pow_at:
+move $t0, $a0 # x position
+move $t1, $a1 # y position
+lw $t2, POW_SIZE # 7x7
+
+la $s0, pow_sprite # Sprite de estrella/cruz
+lw $s1, pow_green_dark # Verde oscuro (contorno)
+lw $s2, pow_green_light # Verde claro (relleno)
+```
+
+Sprite POW (7x7) - Estrella en forma de cruz:
+
+2 (2=verde claro, 1=verde oscuro)
+222
+21212
+2221222
+21212
+222
+2
+Este patrón crea una estrella/cruz llamativa que es fácil de ver en pantalla.
+mips li $t4, 0 # Y counter
+
+draw_pow_y:
+bge $t4, $t2, draw_pow_done_loop
+
+li $t5, 0 # X counter
+
+draw_pow_x:
+bge $t5, $t2, draw_pow_next_y
+
+    # Obtener índice sprite (Y * 7 + X)
+li $t6, 7
+mul $t7, $t4, $t6
+add $t7, $t7, $t5
+add $t8, $s0, $t7
+lb $t8, 0($t8) # Valor del píxel (0-2)
+
+    # Si es 0, transparente
+beqz $t8, skip_pow_pixel
+
+    # Seleccionar color
+li $t9, 1
+beq $t8, $t9, use_pow_dark # 1 = verde oscuro
+li $t9, 2
+beq $t8, $t9, use_pow_light # 2 = verde claro
+j skip_pow_pixel
+
+use_pow_dark:
+move $a2, $s1
+j draw_pow_pixel
+use_pow_light:
+move $a2, $s2
+
+draw_pow_pixel:
+add $a3, $t1, $t4
+sll $a3, $a3, 6
+add $a3, $a3, $t0
+add $a3, $a3, $t5
+sll $a3, $a3, 2
+add $a3, $gp, $a3
+
+sw $a2, 0($a3)
+
+skip_pow_pixel:
+addi $t5, $t5, 1
+j draw_pow_x
+
+draw_explosions / draw_single_explosion / draw_explosion_small_at
+Dibuja las animaciones de explosión (8 frames, 9x9 cada uno).
+draw_explosions:
+la $s0, explosion_0
+move $t0, $s0
+jal draw_single_explosion
+    # ... explosion_1, explosion_2, explosion_3, explosion_4
+draw_single_explosion:
+draw_single_explosion:
+move $s0, $t0
+
+lw $t1, 0($s0)
+beqz $t1, draw_explosion_end # Si no activa, salir
+
+    # Obtener tamaño (0=pequeña, 1=grande)
+lw $t2, 20($s0)
+bnez $t2, draw_large_explosion # Si 1, explosión grande
+
+    # Dibujar explosión pequeña (9x9)
+lw $a0, 4($s0) # x
+lw $a1, 8($s0) # y
+lw $a2, 12($s0) # frame (0-7)
+jal draw_explosion_small_at
+j draw_explosion_end
+
+draw_large_explosion:
+    # TODO: Actualmente dibuja pequeña también
+    # En futuras versiones se implementaría explosión 27x27
+lw $a0, 4($s0)
+lw $a1, 8($s0)
+lw $a2, 12($s0)
+jal draw_explosion_small_at
+draw_explosion_small_at:
+draw_explosion_small_at:
+move $t0, $a0 # x position
+move $t1, $a1 # y position
+move $t2, $a2 # frame (0-7)
+
+    # Validar frame
+bltz $t2, draw_expl_done # Si < 0, salir
+li $t3, 7
+bgt $t2, $t3, draw_expl_done # Si > 7, salir
+
+    # Obtener puntero al sprite del frame
+la $t3, explosion_small_table # Tabla de 8 punteros
+sll $t4, $t2, 2 # frame * 4
+add $t3, $t3, $t4
+lw $s0, 0($t3) # s0 = puntero al sprite
+
+    # Cargar colores
+lw $s1, explosion_red # Color 1: rojo (fuego)
+lw $s2, explosion_yellow # Color 2: amarillo (núcleo)
+lw $s3, explosion_white # Color 3: blanco (partículas)
+Progresión de la animación de explosión:
+
+Frame 0: Centro amarillo pequeño (inicio)
+Frame 1: Centro amarillo con anillo blanco (expansión)
+Frame 2: Más grande, mezcla rojo/amarillo/blanco (máxima expansión)
+Frame 3: Fuego rojo con partículas blancas
+Frame 4: Más disipado, menos denso
+Frame 5: Partículas dispersándose
+Frame 6: Chispas finales
+Frame 7: Últimas partículas blancas (casi invisible)
+
+mips li $t4, 0 # Y counter (0-8)
+
+draw_expl_y:
+li $t5, 9
+bge $t4, $t5, draw_expl_done
+
+li $t5, 0 # X counter (0-8)
+
+draw_expl_x:
+li $t6, 9
+bge $t5, $t6, draw_expl_next_y
+
+    # Calcular índice en sprite (Y * 9 + X)
+li $t6, 9
+mul $t7, $t4, $t6
+add $t7, $t7, $t5
+add $t8, $s0, $t7
+lb $t8, 0($t8) # Valor del píxel (0-3)
+
+    # Si es 0, transparente
+beqz $t8, skip_expl_pixel
+
+    # Seleccionar color
+li $t9, 1
+beq $t8, $t9, use_expl_red # 1 = rojo
+li $t9, 2
+beq $t8, $t9, use_expl_yellow # 2 = amarillo
+li $t9, 3
+beq $t8, $t9, use_expl_white # 3 = blanco
+j skip_expl_pixel
+
+use_expl_red:
+move $s4, $s1
+j draw_expl_pixel
+use_expl_yellow:
+move $s4, $s2
+j draw_expl_pixel
+use_expl_white:
+move $s4, $s3
+
+draw_expl_pixel:
+add $s5, $t1, $t4 # Y_pantalla
+add $s6, $t0, $t5 # X_pantalla
+
+sll $s5, $s5, 6
+add $s5, $s5, $s6
+sll $s5, $s5, 2
+add $s5, $gp, $s5
+
+sw $s4, 0($s5)
+
+skip_expl_pixel:
+addi $t5, $t5, 1
+j draw_expl_x
+
+draw_boss / draw_boss_at
+Dibuja el boss final (sprite 27x27).
+draw_boss:
+    # Borrar posición anterior
+lw $a0, boss_old_x
+lw $a1, boss_old_y
+jal erase_boss
+
+    # Dibujar en nueva posición
+lw $a0, boss_x
+lw $a1, boss_y
+jal draw_boss_at
+draw_boss_at:
+draw_boss_at:
+move $t0, $a0 # x position
+move $t1, $a1 # y position
+lw $t2, BOSS_SIZE # 27x27
+
+la $s0, boss_sprite # Sprite del boss (bombardero grande)
+lw $s1, boss_green_light # Verde claro (cuerpo)
+lw $s2, boss_green_dark # Verde oscuro (sombras)
+lw $s3, boss_white # Blanco (hélices)
+El boss es un bombardero grande (27x27 píxeles, 3x más grande que enemigos normales).
+mips li $t4, 0 # Y counter
+
+draw_boss_y:
+bge $t4, $t2, draw_boss_done
+
+    # Verificar que Y esté en pantalla
+add $t5, $t1, $t4 # Y_pantalla
+li $t6, 64
+bge $t5, $t6, draw_boss_next_y # Si >= 64, skip
+bltz $t5, draw_boss_next_y # Si < 0, skip
+
+li $t6, 0 # X counter
+
+draw_boss_x:
+bge $t6, $t2, draw_boss_next_y
+
+    # Calcular índice sprite (Y * 27 + X)
+li $t7, 27
+mul $t8, $t4, $t7
+add $t8, $t8, $t6
+add $t9, $s0, $t8
+lb $t9, 0($t9) # Valor del píxel (0-3)
+
+    # Si es 0, transparente
+beqz $t9, skip_boss_pixel
+
+    # Seleccionar color
+li $a0, 1
+beq $t9, $a0, use_boss_green_light # 1 = verde claro
+li $a0, 2
+beq $t9, $a0, use_boss_green_dark # 2 = verde oscuro
+li $a0, 3
+beq $t9, $a0, use_boss_white # 3 = blanco
+j skip_boss_pixel
+
+use_boss_green_light:
+move $a1, $s1
+j draw_boss_pixel
+use_boss_green_dark:
+move $a1, $s2
+j draw_boss_pixel
+use_boss_white:
+move $a1, $s3
+
+draw_boss_pixel:
+add $a2, $t1, $t4
+sll $a2, $a2, 6
+add $a2, $a2, $t0
+add $a2, $a2, $t6
+sll $a2, $a2, 2
+add $a2, $gp, $a2
+
+sw $a1, 0($a2)
+
+skip_boss_pixel:
+addi $t6, $t6, 1
+j draw_boss_x
+Nota importante: El boss incluye verificación de bounds para Y (líneas 9-10 del código). Esto es necesario porque el boss aparece desde arriba (Y negativo) y debe dibujarse parcialmente mientras entra a pantalla.
+
+draw_carrier / draw_final_ship
+Dibuja el portaaviones inicial o el barco final (ambos usan el mismo sprite 32x48).
+draw_carrier:
+lw $t0, carrier_visible
+beqz $t0, draw_carrier_done # Si no visible, salir
+
+    # Posición: centrado horizontalmente, Y dinámico
+li $t0, 16 # x = 16 (centrado: (64-32)/2)
+lw $t1, carrier_y_offset # y = offset dinámico (16 inicial)
+lw $t2, CARRIER_HEIGHT # 48 píxeles
+li $t3, 32 # ancho
+El portaaviones tiene 32 píxeles de ancho y se centra horizontalmente en la pantalla de 64 píxeles.
+mips # Si el barco salió completamente de pantalla, ocultarlo
+li $t4, 64
+bge $t1, $t4, hide_carrier_complete
+Si el portaaviones se movió completamente fuera de pantalla por abajo (Y >= 64), se marca como no visible.
+mips la $s0, carrier_sprite # Sprite 32x48
+lw $s1, carrier_gray # Gris (cuerpo)
+lw $s2, carrier_light_gray # Gris claro (líneas)
+lw $s3, carrier_black # Negro (detalles)
+la $s4, sea_colors # Colores del mar (para transparencia)
+
+li $t4, 0 # Y counter
+
+draw_carrier_y:
+bge $t4, $t2, draw_carrier_done
+
+    # Calcular Y en pantalla
+add $t5, $t1, $t4 # Y_pantalla = carrier_y + offset_y
+    # Si Y >= 64, no dibujar esta fila
+li $t6, 64
+bge $t5, $t6, draw_carrier_next_y
+    # Si Y < 0, no dibujar esta fila
+bltz $t5, draw_carrier_next_y
+Verificaciones de bounds: solo dibuja las filas que están dentro de la pantalla (0-63).
+mips li $t6, 0 # X counter
+
+draw_carrier_x:
+bge $t6, $t3, draw_carrier_next_y
+
+    # Calcular X en pantalla
+add $t7, $t0, $t6 # X_pantalla = carrier_x + offset_x
+li $t8, 64
+bge $t7, $t8, skip_carrier_pixel # Si X >= 64, skip
+bltz $t7, skip_carrier_pixel # Si X < 0, skip
+
+    # Obtener índice del sprite (Y * 32 + X)
+sll $t7, $t4, 5 # Y * 32
+add $t7, $t7, $t6 # + X
+add $t8, $s0, $t7
+lb $t8, 0($t8) # Valor del píxel (0-3)
+
+    # Si es 0, dibujar mar (transparencia)
+beqz $t8, draw_carrier_sea
+
+    # Seleccionar color según valor
+li $t9, 1
+beq $t8, $t9, use_carrier_gray # 1 = gris
+li $t9, 2
+beq $t8, $t9, use_carrier_light # 2 = gris claro
+li $t9, 3
+beq $t8, $t9, use_carrier_black # 3 = negro
+j skip_carrier_pixel
+
+use_carrier_gray:
+move $s5, $s1
+j draw_carrier_pixel
+use_carrier_light:
+move $s5, $s2
+j draw_carrier_pixel
+use_carrier_black:
+move $s5, $s3
+j draw_carrier_pixel
+Sistema de transparencia del portaaviones:
+draw_carrier_sea:
+    # Dibujar patrón de mar donde el sprite tiene 0
+add $s6, $t1, $t4 # Y absoluto
+andi $s6, $s6, 0xF # % 16
+sll $s6, $s6, 5 # * 32
+la $s7, wave_pattern
+add $s6, $s7, $s6 # Puntero a fila del patrón
+
+add $s7, $t0, $t6 # X absoluto
+andi $s7, $s7, 0x1F # % 32
+add $s6, $s6, $s7 # Puntero al píxel
+lb $s6, 0($s6) # Valor (0 o 1)
+
+sll $s6, $s6, 2 # * 4
+add $s6, $s4, $s6 # Offset en sea_colors
+lw $s5, 0($s6) # Cargar color del mar
+Cuando el sprite tiene valor 0, en vez de dejarlo transparente, dibuja el patrón del mar. Esto crea el efecto de que el portaaviones "flota" sobre el mar animado.
+draw_carrier_pixel:
+add $s6, $t1, $t4 # Y total
+sll $s6, $s6, 6 # * 64
+add $s6, $s6, $t0 # + X base
+add $s6, $s6, $t6 # + X offset
+sll $s6, $s6, 2 # * 4
+add $s6, $gp, $s6 # + base framebuffer
+
+sw $s5, 0($s6) # Escribir color
+draw_final_ship es idéntico a draw_carrier, solo usa final_ship_y_offset en vez de carrier_y_offset.
+
+draw_hud
+Dibuja el HUD (Heads-Up Display): puntuación, vidas (corazones) e indicador de loop.
+draw_hud:
+    # Dibujar score arriba a la izquierda (posición 2, 2)
+lw $a0, player_score
+li $a1, 2 # x = 2
+li $a2, 2 # y = 2
+jal draw_number # Dibuja el número del score
+El score se dibuja en la esquina superior izquierda.
+Borrar área de corazones:
+mips # Borrar área de corazones con color de mar oscuro
+li $s0, 44 # x inicial corazones
+li $s1, 57 # y inicial corazones (abajo)
+la $t9, sea_colors
+lw $s4, 0($t9) # color azul oscuro del mar
+
+    # Borrar área de 18x5 píxeles
+li $s2, 0 # contador Y
+erase_hearts_y:
+li $t4, 5
+bge $s2, $t4, draw_loop_indicator
+
+li $s3, 0 # contador X
+erase_hearts_x:
+li $t4, 18
+bge $t3, $t4, erase_hearts_next_y
+
+# Calcular offset y dibujar
+add $t7, $s1, $s2 # Y total
+sll $t7, $t7, 6 # * 64
+add $t7, $t7, $s0 # + X base
+add $t7, $t7, $s3 # + X offset
+sll $t7, $t7, 2 # * 4
+add $t7, $gp, $t7
+sw s4,0,(7) # dibujar color de mar
+
+addi $s3, $s3, 1
+j erase_hearts_x
+erase_hearts_next_y:
+addi $s2, $s2, 1
+j erase_hearts_y
+
+Antes de dibujar los corazones, borra el área completa (18x5 píxeles) con color de mar. Esto asegura que no queden "fantasmas" de corazones cuando el jugador pierde vidas.
+
+Indicador de loop (esquina superior derecha):
+
+draw_loop_indicator:
+    # Verificar si hay cooldown activo
+lw $t0, loop_cooldown
+beqz $t0, draw_loop_ready
+
+    # Cooldown activo - dibujar barra roja
+li $t1, 58 # x = 58 (esquina derecha)
+li $t2, 2 # y = 2
+lw $t3, hud_red # Color rojo
+
+    # Dibujar 4 píxeles rojos verticales
+li $t4, 0
+draw_cooldown_pixels:
+li $t5, 4
+bge $t4, $t5, draw_hearts_start
+
+add $t6, $t2, $t4 # Y = y + offset
+sll $t7, $t6, 6
+add $t7, $t7, $t1
+sll $t7, $t7, 2
+add $t7, $gp, $t7
+sw $t3, 0($t7)
+
+addi $t4, $t4, 1
+j draw_cooldown_pixels
+
+Si el loop está en cooldown, dibuja una barra roja vertical de 4 píxeles en la esquina superior derecha.
+
+draw_loop_ready:
+    # Loop disponible - dibujar barra verde
+li $t1, 58
+li $t2, 2
+lw $t3, pow_green_light # Color verde
+
+li $t4, 0
+draw_ready_pixels:
+li $t5, 4
+bge $t4, $t5, draw_hearts_start
+
+add $t6, $t2, $t4
+sll $t7, $t6, 6
+add $t7, $t7, $t1
+sll $t7, $t7, 2
+add $t7, $gp, $t7
+sw $t3, 0($t7)
+
+addi $t4, $t4, 1
+j draw_ready_pixels
+
+Si el loop está disponible (cooldown = 0), dibuja una barra verde. Esto da feedback visual al jugador de cuándo puede usar el barrel roll.
+
+Sistema de corazones (vidas):
+
+draw_hearts_start:
+    # Dibujar corazones según vidas actuales
+lw $t0, player_lives
+li $s0, 44 # x inicial
+li $s1, 57 # y inicial
+
+    # Si lives == 3, dibujar 3 corazones
+li $t3, 3
+bne $t0, $t3, check_two_lives
+
+    # Dibujar corazón 1
+move $a0, $s0
+move $a1, $s1
+jal draw_heart
+
+    # Dibujar corazón 2
+addi $a0, $s0, 6 # x + 6 (espaciado)
+move $a1, $s1
+jal draw_heart
+
+    # Dibujar corazón 3
+addi $a0, $s0, 12 # x + 12
+move $a1, $s1
+jal draw_heart
+j skip_all_hearts
+
+check_two_lives:
+    # Si lives == 2, dibujar 2 corazones
+li $t3, 2
+bne $t0, $t3, check_one_life
+
+move $a0, $s0
+move $a1, $s1
+jal draw_heart
+
+addi $a0, $s0, 6
+move $a1, $s1
+jal draw_heart
+j skip_all_hearts
+
+check_one_life:
+    # Si lives == 1, dibujar 1 corazón
+li $t3, 1
+bne $t0, $t3, check_zero_lives
+
+move $a0, $s0
+move $a1, $s1
+jal draw_heart
+j skip_all_hearts
+
+check_zero_lives:
+    # Si lives == 0, no dibujar nada (ya borrado)
+
+skip_all_hearts:
+    # (retornar)
+Dibuja 0-3 corazones según las vidas del jugador. Los corazones se espacian 6 píxeles entre sí.
+
+Layout del HUD:
+
+Score: 000000        [◼] Loop indicator (verde/rojo)
+(superior izquierdo) (superior derecho)
+
+
+
+
+                      ♥ ♥ ♥ Vidas
+                      (inferior derecho)
+
+---
+
+### draw_number
+Dibuja un número entero usando sprites de dígitos 3x5.
+
+Parámetros:
+- $a0: número a dibujar
+- $a1: posición X inicial
+- $a2: posición Y
+
+draw_number:
+move $s0, $a0 # número
+move $s1, $a1 # x inicial
+move $s2, $a2 # y
+
+    # Caso especial: si es 0, dibujar solo un 0
+bnez $s0, extract_digits
+
+li $a0, 0
+move $a1, $s1
+move $a2, $s2
+jal draw_digit
+j draw_number_done
+```
+Si el número es 0, dibuja un solo dígito 0 y termina.
+
+Extracción de dígitos:
+
+extract_digits:
+    # Contar cuántos dígitos tiene el número
+move $t0, $s0 # copia del número
+li $s3, 0 # contador de dígitos
+
+count_loop:
+beqz $t0, start_drawing
+li $t1, 10
+div $t0, $t1
+mflo $t0 # t0 = t0 / 10
+addi $s3, $s3, 1 # incrementar contador
+j count_loop
+```
+Cuenta cuántos dígitos tiene el número mediante divisiones sucesivas por 10.
+
+Ejemplo: número = 1234
+- Primera iteración: 1234 / 10 = 123, contador = 1
+- Segunda iteración: 123 / 10 = 12, contador = 2
+- Tercera iteración: 12 / 10 = 1, contador = 3
+- Cuarta iteración: 1 / 10 = 0, contador = 4 (termina)
+
+start_drawing:
+    # Calcular divisor para extraer primer dígito
+li $s4, 1 # divisor
+li $t2, 1 # contador
+
+calc_divisor:
+bge $t2, $s3, draw_loop # Si contador >= dígitos, empezar
+li $t1, 10
+mul $s4, $s4, $t1 # divisor *= 10
+addi $t2, $t2, 1
+j calc_divisor
+```
+Calcula el divisor necesario para extraer el primer dígito.
+
+Ejemplo: si el número tiene 4 dígitos, divisor = 10³ = 1000
+
+draw_loop:
+beqz $s3, draw_number_done # Si no quedan dígitos, terminar
+
+    # Extraer dígito más significativo
+div $s0, $s4
+mflo $a0 # dígito = número / divisor
+mfhi $s0 # número = número % divisor
+
+    # Dibujar dígito
+move $a1, $s1
+move $a2, $s2
+jal draw_digit
+
+    # Siguiente posición x
+addi $s1, $s1, 4 # espaciado de 4 píxeles
+
+    # Dividir divisor por 10
+li $t1, 10
+div $s4, $t1
+mflo $s4
+
+addi $s3, $s3, -1 # decrementar contador
+j draw_loop
+
+Extrae y dibuja cada dígito de izquierda a derecha, con espaciado de 4 píxeles entre dígitos.
+
+Ejemplo: número = 1234
+1. Extrae 1 (1234 / 1000), dibuja en X=2
+2. Extrae 2 (234 / 100), dibuja en X=6
+3. Extrae 3 (34 / 10), dibuja en X=10
+4. Extrae 4 (4 / 1), dibuja en X=14
+
+---
+
+draw_digit
+Dibuja un solo dígito (0-9) usando sprites 3x5.
+
+Parámetros:
+- **$a0**: dígito (0-9)
+- **$a1**: posición X
+- **$a2**: posición Y
+
+draw_digit:
+    # Validar dígito (0-9)
+bltz $a0, draw_digit_done # Si < 0, salir
+li $t0, 9
+bgt $a0, $t0, draw_digit_done # Si > 9, salir
+
+move $s0, $a1 # x position
+move $s1, $a2 # y position
+
+    # Obtener puntero al sprite del dígito
+la $t0, digit_table # Tabla de 10 punteros
+sll $t1, $a0, 2 # dígito * 4
+add $t0, $t0, $t1
+lw $s2, 0($t0) # s2 = puntero al sprite
+
+lw $s3, hud_white # Color blanco
+
+Usa `digit_table` (tabla de punteros a los 10 sprites de dígitos) para obtener el sprite correcto.
+
+li $t4, 0 # Y counter (0-4)
+
+draw_digit_y:
+li $t0, 5
+bge $t4, $t0, draw_digit_done
+
+li $t5, 0 # X counter (0-2)
+
+draw_digit_x:
+li $t0, 3
+bge $t5, $t0, draw_digit_next_y
+
+    # Calcular índice en sprite (Y * 3 + X)
+li $t0, 3
+mul $t6, $t4, $t0
+add $t6, $t6, $t5
+add $t7, $s2, $t6
+lb $t7, 0($t7) # Valor del píxel (0 o 1)
+
+    # Si es 0, es transparente
+beqz $t7, skip_digit_pixel
+
+    # Dibujar pixel blanco
+add $t8, $s1, $t4 # Y total
+add $t9, $s0, $t5 # X total
+
+sll $t8, $t8, 6
+add $t8, $t8, $t9
+sll $t8, $t8, 2
+add $t8, $gp, $t8
+
+sw $s3, 0($t8) # Escribir blanco
+
+skip_digit_pixel:
+addi $t5, $t5, 1
+j draw_digit_x
+
+Cada sprite de dígito es 3x5 píxeles, donde 0 = transparente y 1 = blanco.
+
+Ejemplo de sprite del dígito "8":
+
+111
+101
+111
+101
+111
+```
+
+---
+
+### draw_heart
+Dibuja un corazón (sprite 5x5) usado para las vidas.
+
+Parámetros:
+- $a0: posición X
+- $a1: posición Y
+
+draw_heart:
+move $s0, $a0 # x position
+move $s1, $a1 # y position
+
+la $s2, heart_sprite # Sprite 5x5
+lw $t9, hud_red # Color rojo
+
+
+Sprite del corazón (5x5):
+
+11011 (1=rojo, 0=transparente)
+11111
+01110
+00100
+00000
+
+
+li $t4, 0 # Y counter
+
+draw_heart_y:
+li $t0, 5
+bge $t4, $t0, draw_heart_done
+
+li $t5, 0 # X counter
+
+draw_heart_x:
+li $t0, 5
+bge $t5, $t0, draw_heart_next_y
+
+    # Calcular índice sprite (Y * 5 + X)
+li $t0, 5
+mul $t6, $t4, $t0
+add $t6, $t6, $t5
+add $t7, $s2, $t6
+lb $t7, 0($t7) # Valor del píxel (0 o 1)
+
+    # Si es 0, transparente
+beqz $t7, skip_heart_pixel
+
+    # Dibujar pixel rojo
+add $t8, $s1, $t4 # Y total
+add $a2, $s0, $t5 # X total
+
+sll $t8, $t8, 6
+add $t8, $t8, $a2
+sll $t8, $t8, 2
+add $t8, $gp, $t8
+
+sw $t9, 0($t8) # Escribir rojo
+
+skip_heart_pixel:
+addi $t5, $t5, 1
+j draw_heart_x
+
+---
+
+### draw_ready_screen
+Dibuja la pantalla "READY PLAYER 1" al inicio del juego.
+```mips
+draw_ready_screen:
+    # Dibujar "READY" centrado (Y=26)
+    # R (x=19)
+li $a0, 19
+li $a1, 26
+jal draw_letter_R
+
+    # E (x=23)
+li $a0, 23
+li $a1, 26
+jal draw_letter_E
+
+    # A (x=27)
+li $a0, 27
+li $a1, 26
+jal draw_letter_A
+
+    # D (x=31)
+li $a0, 31
+li $a1, 26
+jal draw_letter_D
+
+    # Y (x=35)
+li $a0, 35
+li $a1, 26
+jal draw_letter_Y
+
+Dibuja "READY" centrado horizontalmente en Y=26.
+
+    # Dibujar "PLAYER 1" centrado (Y=33)
+    # P (x=20)
+li $a0, 20
+li $a1, 33
+jal draw_letter_P
+
+    # L (x=24)
+li $a0, 24
+li $a1, 33
+jal draw_letter_L
+
+    # A (x=28)
+li $a0, 28
+li $a1, 33
+jal draw_letter_A
+
+    # Y (x=32)
+li $a0, 32
+li $a1, 33
+jal draw_letter_Y
+
+    # E (x=36)
+li $a0, 36
+li $a1, 33
+jal draw_letter_E
+
+    # R (x=40)
+li $a0, 40
+li $a1, 33
+jal draw_letter_R
+
+    # 1 (x=46)
+li $a0, 1 # dígito 1
+li $a1, 46
+li $a2, 33
+jal draw_digit
+
+Dibuja "PLAYER 1" centrado en Y=33.
+
+Layout de la pantalla READY:
+
+READY
+(Y = 26)
+
+
+PLAYER 1
+(Y = 33)
+```
+
+Esta pantalla se muestra mientras el portaaviones inicial está visible. Cuando el portaaviones desaparece (jugador despegó), la pantalla se oculta.
+
+---
+
+### draw_letter_R, draw_letter_E, draw_letter_A, draw_letter_D, draw_letter_Y, draw_letter_P, draw_letter_L
+
+Estas funciones dibujan letras individuales usando píxeles. Cada letra está codificada como un patrón 3x5.
+
+Ejemplo: draw_letter_A
+
+draw_letter_A:
+move $s0, $a0 # x
+move $s1, $a1 # y
+lw $s2, hud_white # color blanco
+
+    # Patrón de A (3x5):
+    # 111
+    # 101
+    # 111
+    # 101
+    # 101
+
+    # Fila 0
+add $t0, $s0, 0
+add $t1, $s1, 0
+jal draw_text_pixel # Pixel (0,0)
+add $t0, $s0, 1
+jal draw_text_pixel # Pixel (1,0)
+add $t0, $s0, 2
+jal draw_text_pixel # Pixel (2,0)
+
+    # Fila 1
+add $t0, $s0, 0
+add $t1, $s1, 1
+jal draw_text_pixel # Pixel (0,1)
+add $t0, $s0, 2
+jal draw_text_pixel # Pixel (2,1)
+
+    # Fila 2
+add $t0, $s0, 0
+add $t1, $s1, 2
+jal draw_text_pixel # Pixel (0,2)
+add $t0, $s0, 1
+jal draw_text_pixel # Pixel (1,2)
+add $t0, $s0, 2
+jal draw_text_pixel # Pixel (2,2)
+
+    # Fila 3
+add $t0, $s0, 0
+add $t1, $s1, 3
+jal draw_text_pixel # Pixel (0,3)
+add $t0, $s0, 2
+jal draw_text_pixel # Pixel (2,3)
+
+    # Fila 4
+add $t0, $s0, 0
+add $t1, $s1, 4
+jal draw_text_pixel # Pixel (0,4)
+add $t0, $s0, 2
+jal draw_text_pixel # Pixel (2,4)
+```
+
+Todas las letras siguen este mismo patrón: definen qué píxeles dibujar manualmente para formar la letra.
+
+---
+
+### draw_text_pixel
+Función auxiliar que dibuja un solo píxel para texto.
+
+Parámetros:
+- $t0: posición X
+- $t1: posición Y
+- $s2: color (debe estar previamente cargado)
+
+draw_text_pixel:
+sll $t2, $t1, 6 # Y * 64
+add $t2, $t2, $t0 # + X
+sll $t2, $t2, 2 # * 4
+add $t2, $gp, $t2 # + base framebuffer
+sw $s2, 0($t2) # Escribir color
+jr $ra
+
+Calcula la dirección de memoria y escribe el color. Es una función auxiliar simple usada por todas las funciones de letras.
+
+---
+
+## 6. FUNCIONES DE COLISIÓN Y UTILIDADES
+
+### check_collisions
+Verifica colisiones entre el jugador y las balas enemigas.
+```mips
+check_collisions:
+lw $t0, player_x
+lw $t1, player_y
+
+    # Verificar cada bala enemiga
+la $t3, bullet_0
+jal check_bullet_collision
+
+la $t3, bullet_1
+jal check_bullet_collision
+
+la $t3, bullet_2
+jal check_bullet_collision
+
+la $t3, bullet_3
+jal check_bullet_collision
+
+la $t3, bullet_4
+jal check_bullet_collision
+```
+
+check_bullet_collision:
+
+check_bullet_collision:
+lw $t4, 0($t3)
+beqz $t4, check_bullet_end # Si bala no activa, skip
+
+    # Verificar si el jugador es invulnerable (loop activo)
+lw $t8, loop_invulnerable
+bnez $t8, check_bullet_end # Si invulnerable, skip
+
+**Importante:** Si el jugador está ejecutando el barrel roll (invulnerable), las balas no causan daño.
+
+lw $t5, 4($t3) # bullet_x
+lw $t6, 8($t3) # bullet_y
+lw $t7, BULLET_SIZE # 3
+
+    # AABB collision detection
+lw $t2, PLAYER_SIZE # 12
+add $t8, $t0, $t2 # player_right = player_x + 12
+blt $t8, $t5, check_bullet_end # Si player_right < bullet_left, no colisionan
+
+add $t9, $t5, $t7 # bullet_right = bullet_x + 3
+blt $t9, $t0, check_bullet_end # Si bullet_right < player_left, no colisionan
+
+lw $t2, PLAYER_HEIGHT # 8
+add $s0, $t1, $t2 # player_bottom = player_y + 8
+blt $s0, $t6, check_bullet_end # Si player_bottom < bullet_top, no colisionan
+
+add $s1, $t6, $t7 # bullet_bottom = bullet_y + 3
+blt $s1, $t1, check_bullet_end # Si bullet_bottom < player_top, no colisionan
+```
+Algoritmo AABB (Axis-Aligned Bounding Box) estándar para detección de colisiones de rectángulos.
+
+    # ¡COLISIÓN DETECTADA!
+
+    # IMPORTANTE: Desactivar la bala antes de procesar daño
+    # Borrar bala visualmente
+lw $a0, 12($t3) # old_x
+lw $a1, 16($t3) # old_y
+jal erase_bullet
+
+    # Desactivar bala
+sw $zero, 0($t3) # active = 0
+
+    # Procesar daño al jugador
+jal handle_hit
+
+Importante: La bala se desactiva ANTES de llamar a `handle_hit`. Esto previene que una sola bala cause múltiples impactos en frames sucesivos.
+
+---
+
+### handle_hit
+Procesa el daño al jugador cuando es impactado.
+
+handle_hit:
+    # Spawear explosión del jugador
+lw $a0, player_x
+lw $a1, player_y
+li $a2, 0 # size = 0 (pequeña)
+jal spawn_explosion
+```
+Crea una explosión pequeña en la posición del jugador para feedback visual.
+
+    # Restar una vida
+lw $t0, player_lives
+addi $t0, $t0, -1
+sw $t0, player_lives
+
+    # Mostrar vidas restantes en consola
+li $v0, 4
+la $a0, msg_lives
+syscall
+li $v0, 1
+lw $a0, player_lives
+syscall
+li $v0, 4
+la $a0, newline
+syscall
+
+Resta una vida y muestra el mensaje en consola.
+
+    # Verificar game over
+blez $t0, set_game_over # Si vidas <= 0, game over
+jr $ra
+
+set_game_over:
+li $t2, 1
+sw $t2, game_over_flag # Activar flag de game over
+jr $ra
+```
+Si las vidas llegan a 0 o menos, activa el flag de game over que termina el juego en el próximo frame.
+
+---
+
+### check_bullet_enemy_collisions
+Verifica colisiones entre balas del jugador y enemigos (incluyendo el boss).
+
+check_bullet_enemy_collisions:
+    # Verificar si boss está activo
+lw $t0, boss_active
+beqz $t0, check_normal_enemies
+
+    # Boss activo - verificar colisiones con boss
+la $a0, player_bullet_0
+jal test_bullet_hit_boss
+la $a0, player_bullet_1
+jal test_bullet_hit_boss
+    # ... player_bullet_2 a player_bullet_9
+
+Si el boss está activo, verifica colisiones de todas las balas del jugador con el boss.
+
+check_normal_enemies:
+    # Verificar cada bala contra cada enemigo
+la $a0, player_bullet_0
+la $a1, enemy_0
+jal test_bullet_hit_enemy
+la $a0, player_bullet_0
+la $a1, enemy_1
+jal test_bullet_hit_enemy
+la $a0, player_bullet_0
+la $a1, enemy_2
+jal test_bullet_hit_enemy
+
+    # ... (repite para player_bullet_1 a player_bullet_9)
+
+Prueba cada bala del jugador contra cada enemigo. Total: 10 balas × 3 enemigos = 30 verificaciones de colisión por frame.
+
+---
+
+### test_bullet_hit_enemy
+Verifica si una bala del jugador impactó a un enemigo.
+
+Parámetros:
+- $a0: puntero a la bala del jugador
+- $a1: puntero al enemigo
+
+test_bullet_hit_enemy:
+move $t8, $a0 # puntero bala
+move $t9, $a1 # puntero enemigo
+
+    # Verificar si bala está activa
+lw $t0, 0($t8)
+beqz $t0, test_end
+
+    # Verificar si enemigo está activo
+lw $t0, 0($t9)
+beqz $t0, test_end
+```
+Si la bala o el enemigo no están activos, termina inmediatamente.
+
+    # Obtener posiciones
+lw $t0, 4($t8) # bullet_x
+lw $t1, 8($t8) # bullet_y
+lw $t2, 4($t9) # enemy_x
+lw $t3, 8($t9) # enemy_y
+
+    # AABB collision
+lw $t4, PLAYER_BULLET_WIDTH # 1
+add $t4, $t0, $t4 # bullet_right
+
+lw $t5, ENEMY_SIZE # 9
+add $t5, $t2, $t5 # enemy_right
+
+    # Verificar superposición en X
+blt $t4, $t2, test_end # bullet_right < enemy_left
+blt $t5, $t0, test_end # enemy_right < bullet_left
+
+    # Verificar superposición en Y
+lw $t4, PLAYER_BULLET_HEIGHT # 3
+add $t4, $t1, $t4 # bullet_bottom
+
+lw $t5, ENEMY_SIZE # 9
+add $t5, $t3, $t5 # enemy_bottom
+
+blt $t4, $t3, test_end # bullet_bottom < enemy_top
+blt $t5, $t1, test_end # enemy_bottom < bullet_top
+
+Algoritmo AABB para verificar colisión.
+
+    # ¡HAY COLISIÓN!
+
+    # Sumar puntos según tipo de enemigo
+lw $t6, player_score
+lw $s5, 28($t9) # type del enemigo
+
+    # Verificar tipo 2 (amarillo)
+li $t8, 2
+beq $s5, $t8, points_type_3
+
+    # Verificar tipo 1 (verde)
+li $t8, 1
+beq $s5, $t8, points_type_2
+
+    # Tipo 0 (gris): 50 puntos
+lw $t7, POINTS_PER_KILL # 50
+j add_points
+
+points_type_2:
+li $t7, 100 # Verde: 100 puntos
+j add_points
+
+points_type_3:
+li $t7, 150 # Amarillo: 150 puntos
+
+add_points:
+add $t6, $t6, $t7
+sw $t6, player_score
+```
+Suma puntos según el tipo de enemigo destruido.
+
+    # Mostrar mensaje
+li $v0, 4
+la $a0, msg_kill
+syscall
+
+li $v0,4
+la $a0, msg_score
+syscall
+li $v0, 1
+lw $a0, player_score
+syscall
+li $v0, 4
+la $a0, newline
+syscall
+
+Imprime mensaje de enemigo destruido y puntuación actualizada en consola.
+
+    # Spawnear explosión en posición del enemigo
+lw $a0, 12($t9) # enemy_old_x
+lw $a1, 16($t9) # enemy_old_y
+li $a2, 0 # size = 0 (pequeña)
+jal spawn_explosion
+
+Crea una explosión pequeña (9x9) en la posición del enemigo destruido.
+
+    # Desactivar enemigo
+sw $zero, 0($t9) # enemy_active = 0
+
+    # Borrar bala del jugador
+lw $a0, 12($t8) # bullet_old_x
+lw $a1, 16($t8) # bullet_old_y
+jal erase_player_bullet
+
+    # Desactivar bala
+sw $zero, 0($t8) # bullet_active = 0
+
+test_end:
+    # (retornar)
+
+Desactiva tanto el enemigo como la bala que colisionó. Esto libera ambos slots para reutilización.
+
+---
+
+### test_bullet_hit_boss
+Verifica si una bala del jugador impactó al boss.
+
+Parámetros:
+- $a0: puntero a la bala del jugador
+
+test_bullet_hit_boss:
+move $t8, $a0 # puntero bala
+
+    # Verificar si bala está activa
+lw $t0, 0($t8)
+beqz $t0, test_boss_end
+
+    # Obtener posiciones
+lw $t0, 4($t8) # bullet_x
+lw $t1, 8($t8) # bullet_y
+lw $t2, boss_x
+lw $t3, boss_y
+
+    # AABB collision
+lw $t4, PLAYER_BULLET_WIDTH # 1
+add $t4, $t0, $t4 # bullet_right
+
+lw $t5, BOSS_SIZE # 27
+add $t5, $t2, $t5 # boss_right
+
+blt $t4, $t2, test_boss_end # bullet_right < boss_left
+blt $t5, $t0, test_boss_end # boss_right < bullet_left
+
+lw $t4, PLAYER_BULLET_HEIGHT # 3
+add $t4, $t1, $t4 # bullet_bottom
+
+lw $t5, BOSS_SIZE # 27
+add $t5, $t3, $t5 # boss_bottom
+
+blt $t4, $t3, test_boss_end # bullet_bottom < boss_top
+blt $t5, $t1, test_boss_end # boss_bottom < bullet_top
+
+Algoritmo AABB para colisión con el boss (hitbox más grande: 27x27).
+
+    # ¡COLISIÓN CON BOSS!
+
+    # Reducir vida del boss
+lw $t6, boss_health
+addi $t6, $t6, -1
+sw $t6, boss_health
+```
+Cada impacto reduce la vida del boss en 1. El boss tiene 15 HP, requiere 15 impactos para derrotarlo.
+
+    # Borrar bala
+lw $a0, 12($t8) # bullet_old_x
+lw $a1, 16($t8) # bullet_old_y
+jal erase_player_bullet
+
+    # Desactivar bala
+sw $zero, 0($t8)
+
+    # Verificar si boss murió
+lw $t6, boss_health
+bnez $t6, test_boss_end # Si HP > 0, continuar
+
+Desactiva la bala y verifica si el boss fue derrotado.
+
+    # ¡BOSS DERROTADO!
+
+    # Mostrar mensaje
+li $v0, 4
+la $a0, msg_boss_defeated
+syscall
+
+    # Sumar 1000 puntos
+lw $t7, player_score
+lw $t9, BOSS_POINTS # 1000
+add $t7, $t7, $t9
+sw $t7, player_score
+
+    # Mostrar puntuación
+li $v0, 4
+la $a0, msg_score
+syscall
+li $v0, 1
+lw $a0, player_score
+syscall
+li $v0, 4
+la $a0, newline
+syscall
+```
+Si el boss fue derrotado, otorga 1000 puntos (recompensa mayor) y muestra mensajes.
+
+    # Spawear explosión grande del boss
+lw $a0, boss_x
+lw $a1, boss_y
+li $a2, 1 # size = 1 (grande)
+jal spawn_explosion
+
+Crea una explosión grande (en teoría 27x27, pero actualmente usa la pequeña 9x9).
+
+    # Desactivar boss
+sw $zero, boss_active
+
+    # Activar barco final (objetivo de victoria)
+li $t9, 1
+sw $t9, final_ship_active
+
+    # Mostrar mensaje
+li $v0, 4
+la $a0, msg_final_ship
+syscall
+
+test_boss_end:
+    # (retornar)
+
+Desactiva el boss y activa el barco final. El jugador debe sobrevivir hasta que el barco final esté visible para ganar.
+
+---
+
+### erase_bullet, erase_player_bullet, erase_enemy, erase_pow, erase_boss
+Estas funciones borran sprites de sus posiciones anteriores restaurando el fondo correcto.
+
+**Estructura común:**
+
+erase_X:
+    # 1. Guardar parámetros y registros
+    # 2. Para cada píxel del sprite:
+    #    a. Calcular posición absoluta (x, y)
+    #    b. Llamar get_background_color(x, y)
+    #    c. Dibujar el color de fondo obtenido
+    # 3. Restaurar registros y retornar
+
+
+Ejemplo: erase_enemy
+
+erase_enemy:
+move $s0, $a0 # x del enemigo
+move $s1, $a1 # y del enemigo
+
+lw $s2, ENEMY_SIZE # 9x9
+
+li $t5, 0 # Y counter
+
+erase_enemy_y:
+bge $t5, $s2, erase_enemy_done
+
+li $t6, 0 # X counter
+
+erase_enemy_x:
+bge $t6, $s2, erase_enemy_next_y
+
+    # Calcular posición absoluta
+add $a0, $s0, $t6 # x_absoluto = enemy_x + offset_x
+add $a1, $s1, $t5 # y_absoluto = enemy_y + offset_y
+
+    # Guardar registros temporales
+addi $sp, $sp, -12
+sw $t5, 0($sp)
+sw $t6, 4($sp)
+sw $ra, 8($sp)
+
+    # Obtener color de fondo correcto
+jal get_background_color # Retorna color en $v0
+move $s6, $v0 # Guardar color
+
+    # Restaurar registros
+lw $ra, 8($sp)
+lw $t6, 4($sp)
+lw $t5, 0($sp)
+addi $sp, $sp, 12
+
+    # Dibujar el color de fondo
+add $s7, $s1, $t5 # Y_pantalla
+sll $s7, $s7, 6
+add $s7, $s7, $s0
+add $s7, $s7, $t6
+sll $s7, $s7, 2
+add $s7, $gp, $s7
+
+sw $s6, 0($s7) # Escribir color de fondo
+
+addi $t6, $t6, 1
+j erase_enemy_x
+
+erase_enemy_next_y:
+addi $t5, $t5, 1
+j erase_enemy_y
+
+
+Importancia de get_background_color: Esta función es crítica porque determina si el píxel debe ser:
+- Color del mar (si no hay barcos debajo)
+- Color del portaaviones inicial (si está debajo)
+- Color del barco final (si está debajo)
+
+Esto permite que los objetos se muevan correctamente sobre fondos complejos sin dejar "rastros" visuales.
+
+---
+
+### process_input
+Procesa la entrada del teclado del jugador.
+
+process_input:
+    # Verificar si hay tecla presionada
+li $t0, 0xffff0000 # Dirección del Keyboard MMIO
+lw $t1, 0($t0) # Leer status register
+andi $t1, $t1, 1 # Aislar bit de "ready"
+beqz $t1, no_input # Si no hay input, salir
+
+    # Leer tecla presionada
+li $t0, 0xffff0004 # Dirección del data register
+lw $t2, 0($t0) # Leer carácter ASCII
+```
+Usa Memory-Mapped I/O (MMIO) para leer el teclado:
+- 0xffff0000: Status register (bit 0 = 1 si hay tecla lista)
+- 0xffff0004: Data register (código ASCII de la tecla)
+
+Verificar tecla K (barrel roll):
+    # Verificar K minúscula (ASCII 107)
+li $t3, 107
+beq $t2, $t3, do_loop
+    # Verificar K mayúscula (ASCII 75)
+li $t3, 75
+beq $t2, $t3, do_loop
+
+
+Verificar WASD (movimiento):
+    # W (arriba) - ASCII 119 o 87
+li $t3, 119
+beq $t2, $t3, move_up
+li $t3, 87
+beq $t2, $t3, move_up
+
+    # S (abajo) - ASCII 115 o 83
+li $t3, 115
+beq $t2, $t3, move_down
+li $t3, 83
+beq $t2, $t3, move_down
+
+    # A (izquierda) - ASCII 97 o 65
+li $t3, 97
+beq $t2, $t3, move_left
+li $t3, 65
+beq $t2, $t3, move_left
+
+    # D (derecha) - ASCII 100 o 68
+li $t3, 100
+beq $t2, $t3, move_right
+li $t3, 68
+beq $t2, $t3, move_right
+
+Acepta tanto minúsculas como mayúsculas para cada tecla.
+
+Verificar J (disparar):
+
+    # J (disparar) - ASCII 106 o 74
+li $t3, 106
+beq $t2, $t3, shoot
+li $t3, 74
+beq $t2, $t3, shoot
+```
+
+Implementación de movimiento:
+move_up:
+lw $t0, player_y
+lw $t1, MOVE_SPEED # 2 píxeles
+sub $t0, $t0, $t1 # y = y - 2
+bltz $t0, no_input # Si Y < 0, no mover
+sw $t0, player_y
+j no_input
+
+move_down:
+lw $t0, player_y
+lw $t1, MOVE_SPEED # 2 píxeles
+add $t0, $t0, $t1 # y = y + 2
+lw $t2, SCREEN_HEIGHT # 64
+lw $t3, PLAYER_HEIGHT # 8
+sub $t2, $t2, $t3 # límite = 64 - 8 = 56
+bgt $t0, $t2, no_input # Si Y > 56, no mover
+sw $t0, player_y
+j no_input
+
+move_left:
+lw $t0, player_x
+lw $t1, MOVE_SPEED # 2 píxeles
+sub $t0, $t0, $t1 # x = x - 2
+bltz $t0, no_input # Si X < 0, no mover
+sw $t0, player_x
+j no_input
+
+move_right:
+lw $t0, player_x
+lw $t1, MOVE_SPEED # 2 píxeles
+add $t0, $t0, $t1 # x = x + 2
+lw $t2, SCREEN_WIDTH # 64
+lw $t3, PLAYER_SIZE # 12
+sub $t2, $t2, $t3 # límite = 64 - 12 = 52
+bgt $t0, $t2, no_input # Si X > 52, no mover
+sw $t0, player_x
+j no_input
+
+Cada movimiento:
+1. Carga la posición actual
+2. Suma/resta MOVE_SPEED (2 píxeles)
+3. Verifica bounds (no salir de pantalla)
+4. Guarda la nueva posición si es válida
+
+Implementación de disparo y loop:
+
+do_loop:
+jal activate_loop
+j no_input
+
+shoot:
+jal spawn_player_bullet
+j no_input
+
+
+delay
+Introduce una pausa para controlar la velocidad del juego (frame rate).
+
+delay:
+li $t0, 50000 # Contador
+delay_loop:
+addi $t0, $t0, -1 # Decrementar
+bnez $t0, delay_loop # Repetir si != 0
+jr $ra
+
+
+Funcionamiento: Ejecuta 50,000 iteraciones de un loop vacío. En MARS, esto consume aproximadamente 16-17 ms (dependiendo de la velocidad de la CPU del host), logrando aproximadamente 60 FPS.
+
+Nota: Este método no es preciso y varía según:
+- Velocidad del procesador host
+- Configuración de MARS
+- Carga del sistema
+
+---
+
+FLUJO DE EJECUCIÓN DEL CÓDIGO
+
+Estructura General del Programa
+main
+├─> Inicialización
+│ ├─> Imprimir mensajes iniciales
+│ ├─> draw_sea_full (dibujar fondo inicial)
+│ ├─> draw_carrier (dibujar portaaviones inicial)
+│ ├─> draw_player_new (dibujar jugador)
+│ ├─> draw_hud (dibujar interfaz)
+│ └─> draw_ready_screen (pantalla "READY")
+│
+└─> game_loop (BUCLE PRINCIPAL)
+│
+├─> Verificar condiciones de fin
+│ ├─> game_over_flag → game_over
+│ └─> game_won_flag → game_victory
+│
+├─> Gestión de progresión
+│ ├─> Incrementar game_timer
+│ ├─> Verificar activación de boss
+│ └─> Verificar activación de barco final
+│
+├─> ACTUALIZACIÓN (Update)
+│ ├─> scroll_sea
+│ │ ├─> Incrementar sea_scroll_counter
+│ │ ├─> Incrementar sea_scroll_offset
+│ │ ├─> Mover carrier_y_offset
+│ │ ├─> draw_sea_scrolling
+│ │ └─> draw_carrier
+│ │
+│ ├─> process_input
+│ │ ├─> Leer teclado (MMIO)
+│ │ ├─> Actualizar player_x/player_y
+│ │ ├─> activate_loop (si K)
+│ │ └─> spawn_player_bullet (si J)
+│ │
+│ ├─> update_enemies
+│ │ └─> Para cada enemigo:
+│ │ ├─> Actualizar posición
+│ │ ├─> Verificar bounds
+│ │ ├─> Cambiar dirección
+│ │ └─> enemy_shoot (si toca)
+│ │
+│ ├─> update_bullets
+│ │ └─> Para cada bala enemiga:
+│ │ ├─> Mover hacia abajo
+│ │ └─> Desactivar si sale
+│ │
+│ ├─> update_boss (si activo)
+│ │ ├─> Mover verticalmente (hasta Y=5)
+│ │ ├─> Mover horizontalmente (con rebote)
+│ │ └─> boss_shoot (cada 60 frames)
+│ │
+│ ├─> spawn_enemy (si boss no activo)
+│ │ ├─> Verificar enemy_spawn_counter
+│ │ ├─> Determinar tipo (gris/verde/amarillo)
+│ │ ├─> Buscar slot libre
+│ │ ├─> spawn_pow (cada 5 enemigos)
+│ │ └─> Inicializar enemigo
+│ │
+│ ├─> update_player_bullets
+│ │ └─> Para cada bala del jugador:
+│ │ ├─> Mover hacia arriba
+│ │ └─> Desactivar si sale
+│ │
+│ ├─> check_collisions
+│ │ └─> Para cada bala enemiga:
+│ │ ├─> check_bullet_collision
+│ │ ├─> Verificar invulnerabilidad
+│ │ ├─> AABB collision
+│ │ └─> handle_hit (si colisiona)
+│ │ ├─> spawn_explosion
+│ │ ├─> Restar vida
+│ │ └─> set_game_over (si vidas=0)
+│ │
+│ ├─> check_bullet_enemy_collisions
+│ │ ├─> test_bullet_hit_boss (si boss activo)
+│ │ │ ├─> AABB collision
+│ │ │ ├─> Reducir boss_health
+│ │ │ ├─> spawn_explosion (si derrotado)
+│ │ │ └─> Activar final_ship
+│ │ │
+│ │ └─> test_bullet_hit_enemy (10 balas × 3 enemigos)
+│ │ ├─> AABB collision
+│ │ ├─> Sumar puntos
+│ │ ├─> spawn_explosion
+│ │ └─> Desactivar enemigo y bala
+│ │
+│ ├─> update_pow
+│ │ ├─> Mover hacia abajo (cada 5 frames)
+│ │ ├─> check_pow_collision
+│ │ │ ├─> AABB collision
+│ │ │ └─> Activar double_shot (si colisiona)
+│ │ └─> Desactivar si sale
+│ │
+│ ├─> update_explosions
+│ │ └─> Para cada explosión:
+│ │ ├─> Incrementar frame_counter
+│ │ ├─> Avanzar frame (cada 3 frames)
+│ │ └─> Desactivar (al llegar a frame 8)
+│ │
+│ ├─> update_loop
+│ │ ├─> Decrementar loop_cooldown
+│ │ ├─> Avanzar loop_frame (cada 2 frames)
+│ │ └─> Desactivar loop (al llegar a frame 8)
+│ │
+│ └─> update_final_ship (si activo)
+│ ├─> Incrementar final_ship_y_offset
+│ └─> Activar game_won_flag (si visible)
+│
+├─> DIBUJADO (Draw) - Por capas
+│ ├─> draw_final_ship (si activo)
+│ │ └─> Similar a draw_carrier
+│ │
+│ ├─> draw_enemies
+│ │ └─> Para cada enemigo:
+│ │ ├─> erase_enemy (posición anterior)
+│ │ └─> draw_enemy_at (según tipo)
+│ │
+│ ├─> draw_bullets
+│ │ └─> Para cada bala enemiga:
+│ │ ├─> erase_bullet
+│ │ └─> draw_bullet_at
+│ │
+│ ├─> draw_player_bullets
+│ │ └─> Para cada bala del jugador:
+│ │ ├─> erase_player_bullet
+│ │ └─> draw_player_bullet_at
+│ │
+│ ├─> draw_pow (si activo)
+│ │ ├─> erase_pow
+│ │ └─> draw_pow_at
+│ │
+│ ├─> draw_explosions
+│ │ └─> Para cada explosión:
+│ │ └─> draw_explosion_small_at (según frame)
+│ │
+│ ├─> draw_boss (si activo)
+│ │ ├─> erase_boss
+│ │ └─> draw_boss_at
+│ │
+│ ├─> draw_player_new
+│ │ └─> Usa loop_sprite o plane_sprite
+│ │
+│ ├─> draw_hud
+│ │ ├─> draw_number (score)
+│ │ ├─> draw_loop_indicator (verde/rojo)
+│ │ └─> draw_heart × player_lives
+│ │
+│ └─> draw_ready_screen (si show_ready_screen)
+│ ├─> draw_letter_R/E/A/D/Y
+│ ├─> draw_letter_P/L/A/Y/E/R
+│ └─> draw_digit (1)
+│
+├─> delay (control de FPS)
+└─> Repetir game_loop
+
+Jerarquía de Llamadas Principales
+
+Funciones de Alto Nivel:
+- `main` → Punto de entrada
+- `game_loop` → Bucle principal
+- `scroll_sea` → Actualización del mar
+- `process_input` → Control del jugador
+- `update_enemies` → Lógica de enemigos
+- `update_bullets` → Lógica de balas
+- `update_boss` → Lógica del boss
+- `check_collisions` → Detección de impactos
+- `draw_*` → Funciones de renderizado
+
+Funciones de Spawn:
+- `spawn_bullet` → Crea balas enemigas
+- `spawn_enemy` → Crea enemigos
+- `spawn_pow` → Crea power-ups
+- `spawn_player_bullet` → Crea balas del jugador
+- `spawn_explosion` → Crea animaciones
+
+Funciones de Update:
+- `update_single_enemy` → Actualiza un enemigo
+- `enemy_shoot` → Enemigo dispara
+- `update_single_bullet` → Actualiza una bala
+- `update_pow` → Actualiza power-up
+- `check_pow_collision` → Detecta colisión
+- `update_explosions` → Actualiza animaciones
+- `update_loop` → Actualiza barrel roll
+
+Funciones de Dibujado:
+- `draw_sea_scrolling` → Dibuja mar con scroll
+- `draw_carrier` / `draw_final_ship` → Dibuja barcos
+- `draw_enemy_at` → Dibuja un enemigo
+- `draw_bullet_at` → Dibuja una bala
+- `draw_player_new` → Dibuja jugador
+- `draw_hud` → Dibuja interfaz
+- `draw_number` → Dibuja números
+- `draw_digit` → Dibuja un dígito
+- `draw_heart` → Dibuja corazones
+
+Funciones de Borrado:
+- `erase_enemy` → Borra enemigo
+- `erase_bullet` → Borra bala enemiga
+- `erase_player_bullet` → Borra bala del jugador
+- `erase_pow` → Borra power-up
+- `erase_boss` → Borra boss
+- Todas llaman a `get_background_color` → Obtiene color correcto del fondo
+
+Funciones de Colisión:
+- `check_collisions` → Jugador vs balas enemigas
+- `check_bullet_collision` → Verifica una bala
+- `handle_hit` → Procesa daño
+- `check_bullet_enemy_collisions` → Balas jugador vs enemigos/boss
+- `test_bullet_hit_enemy` → Verifica enemigo
+- `test_bullet_hit_boss` → Verifica boss
+
+Funciones Auxiliares:
+- `get_background_color` → Determina color del fondo
+- `process_input` → Lee teclado
+- `activate_loop` → Activa barrel roll
+- `delay` → Control de velocidad
+
