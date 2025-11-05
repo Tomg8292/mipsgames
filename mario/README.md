@@ -1,4 +1,4 @@
-# MARIO - RUBIN, BERARDO, BYRNE, CAFFARATI, RUBERTO
+# MARIO - RUBIN, BERARDO, BYRNE, CAFFARATTI, RUBERTO
 
 ## Descripción
 Este proyecto es un juego de plataformas 2D desarrollado en Assembler MIPS para el simulador MARS 4.5, y el cual luego será ejecutado en un entorno virtual. Inspirado en el clásico Mario Bros, el jugador controla un personaje que navega por un mundo, recolectando monedas, evitando enemigos y saltando sobre plataformas. Es una demostración de desarrollo de videojuegos en un entorno de programación de bajo nivel.
