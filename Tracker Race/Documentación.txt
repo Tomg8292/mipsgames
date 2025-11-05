@@ -1,0 +1,239 @@
+=== TRACKER RACE ===
+Tracker Race es el clásico juego retro en el que un auto en una pista de carreras debe esquivar los obstáculos que aparecen constantemente en la pista de carreras. Fue desarrollado en grupo por Nicolás Diaz, Agustín Franchini, Tiziana Gambino, Tomás Luján y Mateo Giovannetti, en lenguaje assembler con Mars.
+
+Los controles son: 'W' para acelerar, 'S' para frenar, y 'A' y 'D' para moverse a la izquierda y derecha respectivamente.
+Los posibles obstáculos son: un cono, un pozo, una piedra (los tres quitan una vida al colisionar), un charco (no quita vida, pero te relentiza por unos segundos) y un auto (aparece solo cuando nos faltan vidas, al colisionar con él nos suma una vida).
+
+El bitmap display debe configurarse de la siguiente manera:
+
+Unit Width: 4 pixels
+Unit Height: 4 pixels
+Display Width: 256 (64 columnas × 4)
+Display Height: 512 (128 filas × 4)
+Base Address: 0x10008000 ($gp)
+Y luego debemos conectarlo a MIPS.
+
+El Keyboard MMIO debe estar conectado a MIPS para poder leer el teclado.
+
+A continuación, detallaremos el código implementado, comenzando por la sección data, donde encontramos tanto variables utilizadas para la lógica del código como los sprites que utilizamos para dibujar en el juego.
+
+Configuración Base:
+
+display: .word 0x10008000    # Dirección base del bitmap display
+gameStarted: .word 0         # 0 = menú, 1 = jugando
+menuBlink: .word 0           # Contador para efecto de parpadeo
+
+Este efecto de parpadeo de menuBlink es para que parpadee el Press enter que aparece en el menú.
+
+Variables para el player:
+
+carX: .word 28               # Posición X del auto (centrado)
+carLane: .word 1             # Carril actual (0=izq, 1=centro, 2=der)
+carY: .word 50               # Posición Y del auto
+carSpeed: .word 0            # Velocidad (0-3)
+score: .word 0               # Puntuación
+lives: .word 3               # Vidas (máximo 3)
+
+En esta sección encontramos las variables referidas a lo relacionado al auto, como su posición tanto en X como en Y, el carril actual (se inicializa en 1 porque comenzamos en el carril del medio), las posibles velocidades del auto, el contador del score (se suma 1 por obstáculo esquivado, si colisionamos no se suma), y el contador de vidas, que el máximo es de 3.
+
+Carriles:
+
+lane0X: .word 13             # X del carril izquierdo
+lane1X: .word 32             # X del carril centro
+lane2X: .word 51             # X del carril derecho
+
+obsLane0X: .word 5           # X de obstáculos en carril izq (13-8)
+obsLane1X: .word 24          # X de obstáculos en carril centro (32-8)
+obsLane2X: .word 43          # X de obstáculos en carril der (51-8)
+
+Aquí encontramos tanto las posiciones de los carriles como las posiciones de los obstáculos que aparecerán en los carriles.
+
+Múltiples obstáculos:
+
+MAX_OBSTACLES: .word 5       # Máximo de obstáculos simultáneos
+
+obstaclesX: .word 0,0,0,0,0      # Posiciones X
+obstaclesY: .word 0,0,0,0,0      # Posiciones Y
+obstaclesType: .word 0,0,0,0,0   # Tipos (0-4)
+obstaclesActive: .word 0,0,0,0,0 # Estados (0=inactivo, 1=activo)
+
+spawnDistance: .word 35      # Distancia mínima entre obstáculos
+lastLane: .word -1           # Último carril usado
+lastLane2: .word -1          # Penúltimo carril usado
+consecutiveSameLane: .word 0 # Contador de repeticiones de carril
+
+Este es nuestro sistema de obstáculos múltiples. Como mencionamos inicialmente, poseemos 5 tipos de obstáculos distintos, cada uno con su finalidad. Primero encontramos las posiciones de los obstáculos, los tipos y sus estados. Utilizamos un sistema de distancia mínima entre obstáculos, para que el juego no se torne imposible y, aunque por momentos es difícil, con precisión sea posible escapar de ciertas situaciones. Utilizamos también variables que detectan como aparecen los obstáculos para que se repitan la menor cantidad de veces posible.
+
+Efectos:
+
+explosionActive: .word 0     # 1 si hay explosión activa
+explosionX: .word 0          # Posición X de la explosión
+explosionY: .word 0          # Posición Y de la explosión
+explosionTimer: .word 0      # Frames restantes de explosión
+
+slowdownActive: .word 0      # 1 si slowdown está activo
+slowdownTimer: .word 0       # Frames restantes de slowdown
+
+randomSeed: .word 0          # Semilla para generador aleatorio
+frameCounter: .word 0        # Contador de frames
+
+Aquí encontramos la parte de efectos. Toda la primera parte, es para la explosión que aparece cuando colisionamos con un objeto que nos quita vida. El slowdown, lo utilizamos para que, cuando colisionamos con un charco o frenamos, todo se desplace con más lentitud. randomSeed es para intentar el spawneo lo más aleatorio posible de obstáculos.
+
+Scroll:
+
+scrollOffset: .word 0        # Offset actual del scroll (0-63)
+lineOffset: .word 0          # Offset de líneas
+lineSpeed: .word 1           # Velocidad de scroll base
+
+En esta parte, encontramos las variables utilizadas para que la pista scrollee correctamente.
+
+Luego, tenemos todos los sprites:
+animacion_choque_piedra_data es el Sprite del auto que manejamos, y es de 32x32.
+pista_64_data es el Sprite de la pista, que es de 64x64
+cono_data, piedra_data, charco_data, pozo_data y powerup_data son todos los sprites de los obstáculos, todos de 32x32.
+Por último, explosion_data es un Sprite de 16x16 que aparece cuando colisionamos con un objeto que resta vidas.
+
+Ahora, pasemos a .text:
+Nuestra primer función es main, en la que inicializamos registros y luego vamos al menú:
+li $s0, 0x10008000       # Cargar base del display
+li $t0, 12345
+sw $t0, randomSeed       # Inicializar semilla
+li $t0, 1
+sw $t0, frameCounter     # Frame inicial = 1
+
+Luego, vamos hacia menuLoop:
+Es el loop principal del menú. Dibuja fondo animado, título, auto y texto parpadeante.
+Subfunciones llamadas:
+
+updateScroll: Actualiza offset de la pista
+drawTrack: Dibuja fondo animado
+Dibujo de bordes (rojos, 2 pixels izq/der)
+drawCarSprite32: Dibuja auto en posición fija (32, 50)
+Dibujo del título "TRACKER" (línea 10, amarillo 0xFFFF00)
+Dibujo del título "RACE" (línea 20, cyan 0x00FFFF)
+Dibujo de "PRESS ENTER" (línea 108, verde 0x00FF00)
+
+La lógica de parpadeo es la siguiente:
+
+lw $t0, menuBlink
+addi $t0, $t0, 1
+li $t1, 30
+blt $t0, $t1, saveBlinkMenu
+li $t0, 0                # Reset cada 30 frames
+
+El juego solo inicia (es decir, sale del menú y empezamos a jugar) solo si apretamos enter. La lógica para esperar que se apriete el enter es con:
+
+li $t2, 0x0A             # Código de Enter (LF)
+beq $t1, $t2, startGame
+li $t2, 0x0D             # Código de Return (CR)
+beq $t1, $t2, startGame
+
+La siguiente función es startGame:
+startGame inicializa el juego y entra al loop principal. Llena pantalla de gris: 0x5D5D5D, llama a initObstacles y dibuja los bordes rojos
+Inicializa variables:
+
+li $t0, 1
+sw $t0, carLane      # Carril centro
+lw $s1, lane1X       # X = 32
+sw $s1, carX
+
+La siguiente función es loop:
+Es el loop principal del juego. Ejecuta la lógica frame a frame.
+Primera fase: cálculo.
+Se incrementa frameCounter, se verifica si el slowdown está activo y se mueven obstáculos:
+
+# Velocidad base = carSpeed + 2
+# Con slowdown = carSpeed + 3 (mundo se mueve más rápido)
+
+Se verifica si algún obstáculo salió de la pantalla (es decir, si se esquivo un obstáculo) y si efectivamente alguno salió, se suma 1 al score.
+Luego se llama a trySpawnObstacle.
+
+La siguiente fase es la de dibujado. updateScroll actualiza el offset de scroll y drawTrack dibuja la pista animada. Se realiza el loop de obstáculos activos y se dibuja la explosión si la variable explosionActive es igual a 1. Luego se llama a drawCarSprite32 para dibujar el auto siempre al final (para que quede arriba y se vea). Por último se llama a drawHearts para dibujar los corazones de las vidas en la parte inferior la derecha de la pantalla, y a drawScore para dibujar la puntuación en la parte superior izquierda de la pantalla.
+
+La fase 3 es la de los inputs:
+Se lee teclado desde 0xFFFF0000: A/a llama a moveLeft, para ir hacia la izquierda, D/d a moveRight, W/w a moveUp, que acelera como máximo a 3, y como mínimo a 1 si hay slowdown, S/s a moveDown, y la Q para salir del juego.
+
+La fase 4 es la de los efectos. Primero se actualiza el slowdown:
+
+addi $t1, $t1, -1        # Decrementar timer
+bgtz $t1, updateExplosion
+sw $zero, slowdownActive # Desactivar si llegó a 0
+
+Luego se actualiza la explosión: se mueve en Y hacia abajo como si fuera un obstáculo y se decrementa el timer.
+
+En la fase 5, es donde encontramos todo lo relacionado a las colisiones. Esto es según el tipo de obstáculo, por ejemplo:
+Tipo 3 (charco):
+
+  li $t0, 1
+  sw $t0, slowdownActive
+  li $t0, 30
+  sw $t0, slowdownTimer   # 30 frames (~0.5 seg)
+
+Tipo 4 (power up):
+
+  li $t0, 3
+  sw $t0, carSpeed        # Acelera a máximo
+  # Dar vida si lives < 3
+
+Normales:
+
+  addi $t0, $t0, -1       # Restar vida
+  sw $t0, lives
+  # Activar explosión
+  # Si lives = 0 → Game Over
+
+La lógica de Game Over es la siguiente:
+
+waitExplosionLoop:
+    # Dibujar todo 1 vez más
+    # Delay corto (30000 ciclos)
+    # Verificar timer explosión
+    bgtz $t1, waitExplosionLoop
+j exit                     # Salir tras explosión
+
+Las funciones auxiliares utilizadas son:
+fillScreen: llena toda la pantalla de un color.
+updateScroll: actualiza el offset de scroll de la pista, haciendo que la pista se desplace continuamente hacia abajo.
+drawTrack: dibuja 3 tiles de 64x64 para crear el scroll infinito.
+drawPista64Simple: dibuja un tile de 64x64 con clipping vertical.
+setPixel: dibuja un pixel individual con clipping.
+drawCarSprite32: dibuja el auto.
+drawObstacle: dibuja el auto según obsType.
+drawSprite16Scaled: dibuja Sprite de 32x32 escalado a 16x16.
+drawExplosion: dibuja efecto de explosión de 16x16.
+drawHearts: dibuja 3 corazones en la esquina inferior derecha.
+drawScore: dibuja el score en la esquina superior izquierda.
+drawDigit: dibuja un digito de 3x5 píxeles en amarillo.
+initObstacles: inicializa los primeros 2 obstáculos al comenzar el juego.
+trySpawnObstacle: intenta crear un nuevo obstáculo si hay slot libre y el espacio suficiente. Busca un slot inactivo, llama a checkSpawnDistance, si la distancia es suficiente se activa el slot. con getRandomLane se asigna el carril.
+getRandomLane: genera carril aleatorio para obstáculos para evitar que se repitan excesivamente.
+checkSpawnDistance: retorna 1 si la distancia es suficiente, 0 si está muy cerca. Es para verificar que todos los obstáculos activos estén a más de 35 píxeles de Y=-20.
+
+Resumen de sistema de coliciones:
+Cono: tipo 0, resta vida.
+Piedra: tipo 1, resta vida.
+Pozo: tipo 2, resta vida.
+Charco: tipo 3, slowdown de 30 frames.
+Power-up: tipo 4, suma vida y desactiva slowdown.
+
+Velocidad:
+Rango: 0-3
+W: +1 velocidad (máximo de 3, o 1 si hay slowdown)
+S: -1 velocidad (mínimo de 0)
+Slowdown: Fuerza velocidad a 0, el mundo se mueve +3 en vez de +2.
+
+Sistema de vidas:
+Inicialmente hay 3 vidas, siendo este el máximo siempre.
+Si tenemos 2 vidas o 1, hay un 1/30 de chances de que aparezca el power up.
+
+Score:
+Se incrementa en 1 el score por cada obstáculo que sale de la pantalla.
+
+Dimensiones:
+- Ancho: 64 pixels (256 en display)
+- Alto: 128 pixels (512 en display)
+- Carril 0: X = 13 (centro), obstáculos X = 5
+- Carril 1: X = 32 (centro), obstáculos X = 24
+- Carril 2: X = 51 (centro), obstáculos X = 43
+
+
