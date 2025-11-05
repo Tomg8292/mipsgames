@@ -12,9 +12,9 @@ Este README describe cómo funciona el proyecto y cómo ejecutarlo en el simulad
 
 ## Resumen del proyecto
 
-- Archivo principal: Juego Mario/marioScrolling1x1.asm.
+- Archivo principal: Juego Final/marioAssembler.asm.
 - Objetivo: demostrar físicas simples (gravedad, salto, fricción), detección de colisiones (plataformas, tubos, enemigos, monedas), desplazamiento de cámara y renderizado en un framebuffer en memoria.
-- Escala: unidad 1x1 (cada píxel del bitmap se corresponde con 1 unidad de mundo en este archivo).
+- Escala: unidad 4x4 píxeles.
 
 ## Requisitos
 
@@ -35,7 +35,7 @@ Este README describe cómo funciona el proyecto y cómo ejecutarlo en el simulad
 
 ## Cómo ejecutar (MARS)
 
-1. Abrir Juego Mario/marioScrolling1x1.asm en MARS.
+1. Abrir Juego Final/marioAssembler.asm en MARS.
 2. Asegúrate de que el panel de Bitmap Display está configurado así (Tools -> Bitmap Display):
 	 - Unit Width in Pixels: 1
 	 - Unit Height in Pixels: 1
