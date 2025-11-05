@@ -1,178 +1,254 @@
-# Donkey Kong (MIPS Assembly)
+Donkey Kong (MIPS Assembly)
 
-A simplified version of **Donkey Kong** implemented in **MIPS assembly**, running under the MARS or SPIM simulator.  
-This project demonstrates game logic, sprite rendering, and collision handling using low-level system calls and memory-mapped graphics.
+A simplified implementation of Donkey Kong written in MIPS assembly language, designed to run under the MARS or SPIM simulator. This project demonstrates real-time game mechanics including sprite rendering, collision detection, and physics simulation using low-level system calls and memory-mapped I/O.
+Technical Specifications
+Execution Environment
 
----
+    Simulator: MARS 4.5 or SPIM
 
-## 🧠 Overview
+    Display: Bitmap Display (512x1024 pixels, 8x8 unit size)
 
-The game runs a main loop that:
-1. Clears the display buffer.
-2. Draws static elements (platforms, ladders, walls).
-3. Updates the position of the player (Mario) based on user input.
-4. Updates barrels’ positions and animations.
-5. Handles gravity and collisions.
-6. Checks for win/lose conditions.
+    Base Address: 0x10008000 ($gp)
 
-All rendering is performed on a **pixel grid** drawn using system call `0x20` (MARS bitmap display).  
-Each pixel is represented by a **32-bit word** in ARGB format.
+    Input: Keyboard and Display MMIO Simulator
 
----
+Memory Layout
+Data Segment (.data)
 
-## 🧱 Memory Layout
+    Color Definitions: 32-bit ARGB values for rendering
 
-| Section | Description |
-|----------|--------------|
-| `.data`  | Contains all color definitions, sprite dimensions, and object state variables. |
-| `.text`  | Contains executable instructions, subdivided into labeled procedures. |
-| Display Buffer | Controlled by MARS; pixels are drawn using system call `0x20`. |
+    Game State Variables: Player position, velocity, collision flags
 
-### Important Symbols
+    Object Arrays: Barrel data structures (position, velocity, active status)
 
-| Label | Purpose |
-|--------|----------|
-| `barrel_brown` | 32-bit color constant (0x00CD853F) used for rendering barrels. |
-| `player_x`, `player_y` | Player coordinates in pixels. |
-| `barrel_x`, `barrel_y` | Active barrel coordinates. |
-| `gravity_speed` | Constant for vertical motion due to gravity. |
-| `screen_width`, `screen_height` | Display resolution used for drawing and bounds checking. |
+    Level Geometry: Platform and ladder coordinate definitions
 
----
+Key Memory Symbols
+Label	Type	Purpose
+playerX, playerY	word	Player coordinates (pixels)
+playerVelX, playerVelY	word	Player velocity components
+barrels	array	Active barrel objects (20 bytes each)
+onGround, onLadder	word	Collision state flags
+gameOver, playerWon	word	Game state flags
+Rendering System
+Display Configuration
 
-## 🎨 Rendering System
+    Resolution: 64x128 logical units (512x1024 physical pixels)
 
-### `draw_pixel`
-Draws a single pixel at `(x, y)` with a color in `$a2`.
+    Pixel Drawing: System call 0x20 with coordinates in $a0, $a1, color in $a2
 
-```asm
-# a0 = x
-# a1 = y
-# a2 = color
-draw_pixel:
-    li $v0, 0x20      # MARS draw pixel syscall
+    Coordinate System: Origin at top-left, positive Y downward
+
+Core Rendering Procedures
+
+draw_pixel
+mips
+
+ Parameters: $a0 = x, $a1 = y, $a2 = color
+ Clips coordinates to display bounds
+ Uses: $t0 for address calculation
+
+draw_rect
+mips
+
+ Parameters: $a0 = x, $a1 = y, $a2 = width, $a3 = height
+ Stack: color at 24($sp)
+ Fills rectangular region with specified color
+
+draw_barrel (Circular Sprite)
+mips
+
+ Parameters: $a0 = centerX, $a1 = centerY  
+ Renders 4x4 circular barrel using barrel_brown color
+ Pattern: approximates circle with symmetric pixel placement
+
+Physics and Movement System
+Player Physics
+
+    Gravity: Constant acceleration (1 pixel/frame²)
+
+    Jump Force: -4 pixels/frame (upward impulse)
+
+    Terminal Velocity: 3 pixels/frame (maximum fall speed)
+
+    Coyote Time: 5-frame window for late jumps after leaving platform
+
+Collision Detection
+
+    AABB (Axis-Aligned Bounding Box): 2x2 pixel hitbox for player and barrels
+
+    Platform Collision: Line segment intersection tests
+
+    Ladder Collision: Point-in-vertical-range detection
+
+Game Object Management
+Barrel System
+
+Each barrel occupies 20 bytes in memory:
+
+    0($s2): X position
+
+    4($s2): Y position
+
+    8($s2): Vertical velocity
+
+    12($s2): Horizontal velocity
+
+    16($s2): Active flag (0 = inactive, 1 = active)
+
+Barrel behavior includes:
+
+    Periodic spawning from Donkey Kong's position
+
+    Platform collision and bouncing
+
+    Gravity application
+
+    Screen boundary handling
+
+Level Geometry
+
+Platforms defined as (x1, x2, y) tuples:
+mips
+
+plat0: .word 0, 60, 8     Top platform
+plat1: .word 4, 63, 28    Second platform
+ ... etc
+
+Ladders defined as (x, y1, y2) tuples:
+mips
+
+ladder0: .word 56, 10, 26    Right-side ladder
+ladder1: .word 4, 30, 46     Left-side ladder  
+ ... etc
+
+Input Handling
+Control Scheme
+
+    A: Move left
+
+    D: Move right
+
+    W: Jump (ground) / Climb up (ladder)
+
+    S: Climb down (ladder only)
+
+    Q: Quit game
+
+Input Processing
+mips
+
+check_input:
+    li $t0, 0xffff0000     MMIO control address
+    lw $t1, 0($t0)         Check if key available
+    beq $t1, $zero, no_key_pressed
+    
+    li $t0, 0xffff0004     MMIO data address  
+    lw $t1, 0($t0)         Read key code
+     Process key and update game state
+
+Main Game Loop Architecture
+mips
+
+game_loop:
+    jal clear_screen           Frame buffer reset
+    jal draw_platforms         Static level geometry
+    jal draw_ladders           Climbing structures
+    jal draw_dk                Donkey Kong sprite
+    jal check_input            Player controls
+    jal apply_horizontal_movement   X-axis physics
+    jal check_ladder_collision      Ladder interaction
+    jal check_platform_collision    Ground detection
+    jal apply_gravity               Y-axis physics
+    jal update_spawn_timer          Barrel generation
+    jal update_all_barrels          Barrel physics
+    jal check_barrel_platform_collision   Barrel-ground interaction
+    jal draw_all_barrels            Barrel rendering
+    jal draw_player                 Player sprite
+    jal check_all_collisions        Player-barrel collision
+    jal check_victory               Win condition
+    
+    li $v0, 32                     Delay for frame rate control
+    li $a0, 50                     50ms delay (~20 FPS)
     syscall
-    jr $ra
+    
+    j game_loop                    Next frame
 
-draw_barrel
+Sprite Designs
+Player (Mario)
 
-Draws a circular barrel sprite centered on (x, y) using a symmetric pattern.
-The sprite uses barrel_brown for its color and a fixed pattern of pixel offsets.
+    Dimensions: 6x8 pixels
 
-# a0 = center X
-# a1 = center Y
-draw_barrel:
-    la $t0, barrel_pattern
-    lw $t1, barrel_brown
-    ...
+    Hitbox: 2x2 pixels at feet (bottom-center)
 
-The pattern approximates a 4×4 circle:
+    Color Scheme: Red cap, blue overalls, skin tones
 
- .X.
- XXX
- XXX
- .X.
+    Rendering: Multi-layer composition with precise pixel placement
 
-🕹️ Input Handling
+Barrel
 
-Input is read using syscall 12 (read_char):
+    Dimensions: 4x4 pixels (circular approximation)
 
-li $v0, 12
-syscall
+    Color: Light brown (0x00CD853F)
 
-Accepted keys:
+    Pattern: Symmetric arrangement for circular appearance
 
-    'a': Move left
+Collision System Details
+Platform Collision
+mips
 
-    'd': Move right
+check_single_platform:
+     Check if player feet (y+2) are within 3 pixels of platform
+     Verify player X range overlaps platform X range
+     If collision: set onGround, reset velocity, position player on platform
 
-    'w': Jump (apply upward velocity)
+Barrel-Player Collision
+mips
 
-    'q': Quit
+check_all_collisions:
+     For each active barrel:
+     Test AABB overlap between player (2x2) and barrel (2x2)
+     If collision detected: set gameOver = 1, playerWon = 0
 
-The input is non-blocking; when no key is pressed, the previous state persists until the next iteration.
-⚙️ Physics & Collisions
-Gravity
+Victory Conditions
+Win Condition
 
-A constant downward velocity (gravity_speed) is applied each frame to both the player and barrels.
-When the next Y position would intersect a platform, movement is stopped.
-Collision Model
+Player reaches Donkey Kong's platform and makes contact:
 
-Each object uses axis-aligned bounding boxes (AABB) for simple detection.
+    Player Y position between 4-10
 
-    Player: 8×8 region
+    Horizontal overlap with Donkey Kong sprite
 
-    Barrel: 8×8 region
+    Triggers victory screen with "YOU WON!" message
 
-    Platforms: Flat surfaces defined as line segments in data memory
+Loss Condition
 
-The routine check_collision returns:
+Player collides with any active barrel:
 
-    $v0 = 1 if collision detected
+    Immediate game over
 
-    $v0 = 0 otherwise
+    Triggers defeat screen with "GAME OVER" message
 
-🔄 Game Loop Structure
+Performance Considerations
 
-main_loop:
-    jal clear_screen
-    jal draw_platforms
-    jal update_player
-    jal update_barrels
-    jal check_collisions
-    jal draw_player
-    jal draw_barrels
-    j main_loop
+    Frame Rate: Target 20 FPS with 50ms delays
 
-Each subroutine manages a specific subsystem.
-The game runs indefinitely until 'q' is pressed.
-🧩 Key Procedures
-Procedure	Description
-clear_screen	Fills the display with background color.
-draw_platforms	Renders the static level layout.
-update_player	Applies input, gravity, and collisions.
-update_barrels	Moves barrels, applies physics, and respawns them.
-draw_player	Draws Mario sprite at (player_x, player_y).
-draw_barrels	Iterates over active barrels and calls draw_barrel.
-🧱 Barrel System
+    Rendering Optimization: Selective redraw of changed elements
 
-Barrels are spawned periodically and roll across platforms.
+    Collision Optimization: Early termination on first collision detection
 
-Each barrel has:
+    Memory Usage: Efficient packing of game state in data segment
 
-barrel_x: .word <x>
-barrel_y: .word <y>
-barrel_vx: .word <horizontal velocity>
-barrel_vy: .word <vertical velocity>
+Extension Points
 
-The update logic includes:
+    Multiple simultaneous barrels with independent physics
 
-    Apply gravity to vy.
+    Animated sprite frames for character movement
 
-    Add vx and vy to position.
+    Sound effects using MARS system calls
 
-    Check for collisions with platforms or walls.
+    Score tracking and level progression
 
-    Invert velocity if hitting a wall.
+    Enhanced AI for barrel pathfinding
 
-    Remove barrel if off-screen.
-
-📈 Performance Notes
-
-    The rendering loop is CPU-bound due to syscall overhead.
-
-    Optimizations can be achieved by batching draws or limiting refresh rate.
-
-    No interrupts are used — everything runs in a polling-based infinite loop.
-
-🔧 Future Improvements
-
-    Add multiple simultaneous barrels.
-
-    Implement enemy collision and lives system.
-
-    Add a simple scoring and level progression system.
-
-    Replace MARS syscalls with memory-mapped display writes for speed.
-
-    Introduce sound using syscall 31 (play tone).
+This implementation demonstrates complete game development in assembly language, showcasing low-level graphics programming, real-time input handling, and physics simulation within the constraints of the MIPS architecture and MARS simulator environment.
