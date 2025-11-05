@@ -25,7 +25,7 @@ Este README describe cómo funciona el proyecto y cómo ejecutarlo en el simulad
 
 ## Conceptos importantes y constantes
 
-- framebuffer: buffer reservado en el segmento de datos (base por defecto en MARS: 0x10010000 si usas "static data") — se usa para almacenar la imagen (512×256 píxeles, 32-bit color).
+- framebuffer: buffer reservado en el segmento de datos (base por defecto en MARS: 0x10080000 si usas "gp") — se usa para almacenar la imagen (512×256 píxeles, 32-bit color).
 - Resolución interna usada por este archivo: 512×256 píxeles.
 - Posición inicial del jugador:
 	- mario_x = 40
@@ -41,7 +41,7 @@ Este README describe cómo funciona el proyecto y cómo ejecutarlo en el simulad
 	 - Unit Height in Pixels: 1
 	 - Display Width in Pixels: 512
 	 - Display Height in Pixels: 256
-	 - Base address for display: 0x10010000 (dirección base del framebuffer en segmento de datos estático).
+	 - Base address for display: 0x10080000 (dirección base del framebuffer en segmento de datos gp).
 3. Tools -> Keyboard MMIO -> Connect to MIPS (habilita lectura de teclado en 0xffff0000).
 4. Assemble el programa (Assemble), luego Run.
 5. Verás un texto de inicio en la consola. Presiona SPACE para empezar.
@@ -84,9 +84,9 @@ Estas tablas se inicializan en init_game_state (las flags de enemigos y monedas 
 
 Sintetizo la causa por la que el juego antes saltaba directo a victoria:
 - Originalmente el código de dibujo escribía directamente en una dirección constante 0x10008000. Esa dirección coincidía con la región de datos estáticos del ensamblador y sobrescribía variables (como mario_x), escribiendo ahí valores de color. Si mario_x se machacaba con un color (por ejemplo 0x5C94FC), al leer mario_x el valor era grande (≈ 6 dígitos hex) y la comprobación mario_x >= CASTLE_X era verdadera.
-- Solución aplicada: he reservado un framebuffer en .data y modifiqué las rutinas de dibujo para usar la $t0, framebuffer (es decir, escribir en la zona de framebuffer dedicada) en lugar de una dirección hardcodeada. En MARS la dirección base de ese buffer suele ser 0x10010000 cuando usas "static data".
+- Solución aplicada: he reservado un framebuffer en .data y modifiqué las rutinas de dibujo para usar la $t0, framebuffer (es decir, escribir en la zona de framebuffer dedicada) en lugar de una dirección hardcodeada. En MARS la dirección base de ese buffer suele ser 0x10080000 cuando usas "gp".
 
-Si ves todavía la pantalla celeste y el juego no renderiza los objetos tras el cambio, comprueba que el Base address for display en el panel Bitmap Display esté apuntando a la dirección donde MARS cargó el segmento de datos (usualmente 0x10010000).
+Si ves todavía la pantalla celeste y el juego no renderiza los objetos tras el cambio, comprueba que el Base address for display en el panel Bitmap Display esté apuntando a la dirección donde MARS cargó el segmento de datos (usualmente 0x10080000).
 
 ## Cambios recientes importantes (resumen)
 
@@ -97,7 +97,7 @@ Si ves todavía la pantalla celeste y el juego no renderiza los objetos tras el 
 ## Problemas frecuentes y cómo resolverlos
 
 - Pantalla solo celeste y/o "YOU WIN" inmediato:
-	- Comprueba que Bitmap Display -> Base address for display apunte a 0x10010000 (o la dirección donde tu emulador carga el segmento .data).
+	- Comprueba que Bitmap Display -> Base address for display apunte a 0x10080000 (o la dirección donde tu emulador carga el segmento .data).
 	- Verifica que framebuffer exista (búsqueda en la tabla de símbolos o en el Data Segment en MARS) y apunta a la dirección indicada en el Bitmap Display.
 - Caracteres raros en consola tras usar syscall print:
 	- El ensamblador imprime enteros y bytes según lo que se pasa en $v0 / $a0. Si ves bytes no legibles, probablemente se imprimió un valor numérico grande como color en lugar de la posición esperada.
