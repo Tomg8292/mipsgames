@@ -13,11 +13,11 @@
     blockColor3: .word 0x00FFFF00   # Amarillo
     blockColor4: .word 0x0000FF00   # Verde
     
-    # ==================== PALETA (MÁS GRANDE Y VISIBLE) ====================
-    paddleX: .word 20               # Más centrada
-    paddleY: .word 54               # Más arriba (era 50)
-    paddleWidth: .word 24           # MUY ancha (era 20)
-    paddleHeight: .word 4           # Más alta (era 5)
+    # ==================== PALETA (TAMAÑO REDUCIDO) ====================
+    paddleX: .word 26               # Centrada (64/2 - 12/2 = 26)
+    paddleY: .word 56               # Cerca del fondo
+    paddleWidth: .word 12           # Ancho moderado (antes era 24)
+    paddleHeight: .word 3           # Altura moderada (antes era 4)
     paddleSpeed: .word 3            # Velocidad de movimiento
     
     # ==================== PELOTA ====================
@@ -32,7 +32,7 @@
     blocksPerRow: .word 10
     blockRows: .word 4
     blockStartX: .word 2
-    blockStartY: .word 4             # Más arriba (era 8)
+    blockStartY: .word 4
     
     blocks: .word 1,1,1,1,1,1,1,1,1,1
             .word 1,1,1,1,1,1,1,1,1,1
@@ -260,11 +260,62 @@ saveX:
     jal checkPaddleCollision
     beqz $v0, checkBlocks
     
-    # Rebote en paleta
+    # ===== NUEVO: REBOTE CON ÁNGULO SEGÚN ZONA DE LA PALETA =====
+    # v1 contiene la posición relativa en la paleta (0 a paddleWidth-1)
+    move $t8, $v1
+    
+    # Invertir velocidad Y (rebote hacia arriba)
     lw $t1, ballVelY
     sub $t1, $zero, $t1
     sw $t1, ballVelY
     
+    # Calcular zona (dividir paleta en 5 zonas)
+    lw $t9, paddleWidth             # Ancho total de paleta (12)
+    
+    # Zona 1: Extremo izquierdo (0-1) -> velX = -2
+    li $t0, 2
+    blt $t8, $t0, zone1
+    
+    # Zona 2: Izquierda (2-4) -> velX = -1
+    li $t0, 5
+    blt $t8, $t0, zone2
+    
+    # Zona 3: Centro (5-6) -> velX = 0
+    li $t0, 7
+    blt $t8, $t0, zone3
+    
+    # Zona 4: Derecha (7-9) -> velX = 1
+    li $t0, 10
+    blt $t8, $t0, zone4
+    
+    # Zona 5: Extremo derecho (10-11) -> velX = 2
+    j zone5
+
+zone1:
+    li $t0, -2
+    sw $t0, ballVelX
+    j paddleBounce_done
+
+zone2:
+    li $t0, -1
+    sw $t0, ballVelX
+    j paddleBounce_done
+
+zone3:
+    li $t0, 0
+    sw $t0, ballVelX
+    j paddleBounce_done
+
+zone4:
+    li $t0, 1
+    sw $t0, ballVelX
+    j paddleBounce_done
+
+zone5:
+    li $t0, 2
+    sw $t0, ballVelX
+
+paddleBounce_done:
     # +1 punto por rebote
     lw $t2, score
     addi $t2, $t2, 1
@@ -325,7 +376,7 @@ respawn:
     sw $t0, ballVelY
     
     # Centrar paleta
-    li $t0, 20
+    li $t0, 26
     sw $t0, paddleX
     
     # Pausa de 2 segundos
@@ -344,6 +395,8 @@ moveBall_end:
     jr $ra
 
 # ==================== COLISIÓN CON PALETA ====================
+# Retorna: v0 = 1 si hay colisión, 0 si no
+#          v1 = posición relativa en la paleta (0 a paddleWidth-1)
 checkPaddleCollision:
     lw $t0, ballX
     lw $t1, ballY
@@ -362,12 +415,14 @@ checkPaddleCollision:
     add $t6, $t2, $t4
     bge $t0, $t6, noPaddleCol
     
-    # ¡COLISIÓN!
+    # ¡COLISIÓN! Calcular posición relativa
+    sub $v1, $t0, $t2               # v1 = ballX - paddleX (0 a paddleWidth-1)
     li $v0, 1
     jr $ra
 
 noPaddleCol:
     li $v0, 0
+    li $v1, 0
     jr $ra
 
 # ==================== COLISIÓN CON BLOQUES ====================
@@ -654,7 +709,7 @@ eraseBlock:
     li $s4, 0
 
 eraseBlock_loopY:
-    bge $s4, $t3, eraseBlock_end
+    bge $s4, $t3, eraseBlock_done
     li $s5, 0
 
 eraseBlock_loopX:
@@ -677,7 +732,7 @@ eraseBlock_nextY:
     addi $s4, $s4, 1
     j eraseBlock_loopY
 
-eraseBlock_end:
+eraseBlock_done:
     lw $ra, 0($sp)
     addi $sp, $sp, 4
     jr $ra
