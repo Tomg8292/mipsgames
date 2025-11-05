@@ -124,19 +124,17 @@ getBlockIDFromRow:
     # $a0 = fila
     # Retorna: $v0 = ID del bloque
     
-    li $v0, 1                   # Por defecto: OBJ_BLOCK_RED
+    li $v0, 1                   # Fila 0: Púrpura (OBJ_BLOCK_RED)
     
-    li $t0, 0
-    beq $a0, $t0, get_block_id_end
     li $t0, 1
-    beq $a0, $t0, block_yellow
+    beq $a0, $t0, block_yellow  # Fila 1: Amarillo
     li $t0, 2
-    beq $a0, $t0, block_blue
+    beq $a0, $t0, block_blue    # Fila 2: Azul
     li $t0, 3
-    beq $a0, $t0, block_green
+    beq $a0, $t0, block_green   # Fila 3: Verde
     li $t0, 4
-    beq $a0, $t0, block_magenta
-    li $v0, 6                   # OBJ_BLOCK_WHITE
+    beq $a0, $t0, block_orange  # Fila 4: Naranja
+    li $v0, 6                   # Fila 5: Blanco
     j get_block_id_end
     
 block_yellow:
@@ -148,8 +146,9 @@ block_blue:
 block_green:
     li $v0, 4
     j get_block_id_end
-block_magenta:
+block_orange:
     li $v0, 5
+    j get_block_id_end
     
 get_block_id_end:
     jr $ra
@@ -332,19 +331,19 @@ updatePaddleInMatrix:
     addiu $sp, $sp, -4
     sw $ra, 0($sp)
     
-    # Limpiar área completa de paleta (y=240-247)
+    # Limpiar área completa donde puede estar la paleta (y=240-248)
     li $a0, 0
     li $a1, 240
     li $a2, 256
-    li $a3, 8  # Cambiado de 4 a 8
+    li $a3, 9                   # 9px de alto (tamaño del sprite)
     li $t0, 0                   # OBJ_EMPTY
     jal fillRectInMatrix
     
-    # Dibujar paleta en nueva posición
+    # Dibujar paleta en nueva posición (usando el sprite completo)
     lw $a0, paddleX
     lw $a1, paddleY
-    lw $a2, paddleWidth
-    lw $a3, paddleHeight
+    li $a2, 35                  # ancho del sprite
+    li $a3, 9                   # alto del sprite
     lw $t0, OBJ_PADDLE
     jal fillRectInMatrix
     
